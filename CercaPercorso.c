@@ -5,14 +5,14 @@
 
 
 
-#define STAZIONEADD "aggiungi-stazione"
-#define STAZIONERM "demolisci-stazione"
-#define AUTOADD "aggiungi-auto"
-#define AUTORM "rottama-auto"
-#define PERCORSO "pianifica-percorso"
-#define MAXCHAR 300                                                   // Siccome acquisisco una stringa in ingresso e non conosco la sua dimensione massima, prendo la dimensione massima nel caso peggiore
-#define RED true
-#define BLACK false
+#define STAZIONEADD "aggiungi-stazione"                               // la funzionialità "aggiungi-stazione"
+#define STAZIONERM "demolisci-stazione"                               // la funzionialità "demolisci-stazione"
+#define AUTOADD "aggiungi-auto"                                       // la funzionialità "aggiungi-auto"
+#define AUTORM "rottama-auto"                                         // la funzionialità "rottama-auto"
+#define PERCORSO "pianifica-percorso"                                 // la funzionialità "pianifica-percorso"
+#define MAXCHAR 1024                                                  // Siccome acquisisco una stringa in ingresso e non conosco la sua dimensione massima, prendo la dimensione massima nel caso peggiore
+#define RED true                                                      // un nodo rosso di un albero rosso-nero corrisponde a true
+#define BLACK false                                                   // un nodo nero di un albero rosso-nero corrisponde a false
 
 
 
@@ -67,17 +67,23 @@ int main (int argc, char *argv[]) {
     if (c == EOF)
       break;
     *(str_tmp+i) = '\0';                                              // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
-    token = strtok(str_tmp, " ");                                     // ELABORAZIONE DELL'INPUT, SEPARO LA STRINGA PERCHÉ POTREI AVERE "aggiungi-stazione 20 3 5 10 15"
+    token = strtok(str_tmp, " ");                                     // SEPARO LA STRINGA DI INPUT PER PRENDERE LA PRIMA PAROLA CONTENENTE IL COMANDO
 
     if (!strcmp(token, STAZIONEADD)) {                                // <- QUI AVVIENE LA SCELTA E L'ESECUZIONE DEL COMANDO
-      token = strtok(NULL, " ");                                      // SCORRO L'INPUT PRECEDENTEMENTE SEPARATO
-      num = atoi(token);                                              // CONVERTO IL NUMERO DA STRINGA A INTERO
+      token = strtok(NULL, " ");                                      // SEPARO LA STRINGA DI INPUT PER PRENDERE LA DISTANZA DELLA STAZIONE
+      num = atoi(token);                                              // CONVERTO LA DISTANZA DA STRINGA A INTERO
       if (searchNode(tree, tree->root, num) == tree->NIL) {           // SE NON ESISTE LA STAZIONE ALLORA LA INSERISCO
-        node_tmp = inNode();
-        node_tmp->key = num;
-        insertTree(tree, node_tmp);
-        puts("aggiunta");
-        //...
+        node_tmp = inNode();                                          // INIZIALIZZO IL NODO DA AGGIUNGERE
+        node_tmp->key = num;                                          // ASSEGNO AL NODO LA CHIAVE (DISTANZA DELLA STAZIONE)
+        insertTree(tree, node_tmp);                                   // INSERISCO IL NODO NELL'ALBERO
+        puts("aggiunta");                                             // STAMPO IN OUTPUT CHE LA STAZIONE È STATA AGGIUNTA
+        token = strtok(NULL, " ");                                    // SEPARO LA STRINGA DI INPUT PER PRENDERE IL NUMERO DI AUTO NELLA STAZIONE
+        num = atoi(token);                                            // CONVERTO IL NUMERO DA STRINGA A INTERO
+        for (i = num; i > 0; i--) {
+          token = strtok(NULL, " ");                                  // SEPARO LA STRINGA DI INPUT PER PRENDERE L'AUTONOMIA DELL'AUTOMOBILE
+          num = atoi(token);                                          // CONVERTO IL NUMERO DA STRINGA A INTERO
+          // ...
+        }
       } else {
         puts("non aggiunta");
       }
@@ -197,36 +203,36 @@ void insertFixup (tree_t *tree, node_t *z) {
       if (x == x->parent->left) {                                     // se x è figlio sinistro
         y = x->parent->right;                                         // y è fratello di x
         if (y->color == RED) {
-          x->color = BLACK;                                           // Caso 1
-          y->color = BLACK;                                           // Caso 1
-          x->parent->color = RED;                                     // Caso 1
-          insertFixup (tree, x->parent);                              // Caso 1
+          x->color = BLACK;                                           // caso 1
+          y->color = BLACK;                                           // caso 1
+          x->parent->color = RED;                                     // caso 1
+          insertFixup (tree, x->parent);                              // caso 1
         } else {
           if (z == x->right) {
-            z = x;                                                    // Caso 2
-            leftRotate (tree, z);                                     // Caso 2
-            x = z->parent;                                            // Caso 2
+            z = x;                                                    // caso 2
+            leftRotate (tree, z);                                     // caso 2
+            x = z->parent;                                            // caso 2
           }
-          x->color = BLACK;                                           // Caso 3
-          x->parent->color = RED;                                     // Caso 3
-          rightRotate(tree, x->parent);                               // Caso 3
+          x->color = BLACK;                                           // caso 3
+          x->parent->color = RED;                                     // caso 3
+          rightRotate(tree, x->parent);                               // caso 3
         }
       } else {                                                        // se x è il figlio destro
         y = x->parent->left;                                          // y è fratello di x
         if (y->color == RED) {
-          x->color = BLACK;                                           // Caso 1
-          y->color = BLACK;                                           // Caso 1
-          x->parent->color = RED;                                     // Caso 1
-          insertFixup (tree, x->parent);                              // Caso 1
+          x->color = BLACK;                                           // caso 1
+          y->color = BLACK;                                           // caso 1
+          x->parent->color = RED;                                     // caso 1
+          insertFixup (tree, x->parent);                              // caso 1
         } else {
           if (z == x->left) {
-            z = x;                                                    // Caso 2
-            rightRotate (tree, z);                                    // Caso 2
-            x = z->parent;                                            // Caso 2
+            z = x;                                                    // caso 2
+            rightRotate (tree, z);                                    // caso 2
+            x = z->parent;                                            // caso 2
           }
-          x->color = BLACK;                                           // Caso 3
-          x->parent->color = RED;                                     // Caso 3
-          leftRotate(tree, x->parent);                                // Caso 3
+          x->color = BLACK;                                           // caso 3
+          x->parent->color = RED;                                     // caso 3
+          leftRotate(tree, x->parent);                                // caso 3
         }
       }
     }
@@ -292,7 +298,7 @@ void rightRotate (tree_t *tree, node_t *y) {
 node_t* searchNode (tree_t *tree, node_t *x, int newKey) {
   if (x == tree->NIL)                                                 // Se sono a una foglia ritorno false
     return x;
-  else if (x->key == newKey)                                          // Caso base, se arrivo al valore cercato ritorno true
+  else if (x->key == newKey)                                          // caso base, se arrivo al valore cercato ritorno true
     return x;
   else if (newKey < x->key) {
     return searchNode(tree, x->left, newKey);
@@ -354,52 +360,52 @@ node_t* searchAndDelete (tree_t *tree, node_t *z, int newKey) {
 void deleteFixup (tree_t *tree, node_t *x) {
   node_t *w;
   if (x->color == RED || x->parent == tree->NIL) {
-    x->color = BLACK;                                                 // Caso 0
+    x->color = BLACK;                                                 // caso 0
   } else if (x == x->parent->left) {                                  // x e' figlio sinistro
     w = x->parent->right;                                             // w e' fratello di x
     if (w->color == RED) {
-      w->color = BLACK;                                               // Caso 1
-      x->parent->color = RED;                                         // Caso 1
-      leftRotate(tree, x->parent);                                    // Caso 1
-      w = x->parent->right;                                           // Caso 1
+      w->color = BLACK;                                               // caso 1
+      x->parent->color = RED;                                         // caso 1
+      leftRotate(tree, x->parent);                                    // caso 1
+      w = x->parent->right;                                           // caso 1
     }
     if (w->left->color == BLACK && w->right->color == BLACK) {
-      w->color = RED;                                                 // Caso 2
-      deleteFixup(tree, x->parent);                                   // Caso 2
+      w->color = RED;                                                 // caso 2
+      deleteFixup(tree, x->parent);                                   // caso 2
     } else {
       if (w->right->color == BLACK) {
-        w->left->color = BLACK;                                       // Caso 3
-        w->color = RED;                                               // Caso 3
-        rightRotate(tree, w);                                         // Caso 3
-        w = x->parent->right;                                         // Caso 3
+        w->left->color = BLACK;                                       // caso 3
+        w->color = RED;                                               // caso 3
+        rightRotate(tree, w);                                         // caso 3
+        w = x->parent->right;                                         // caso 3
       }
-      w->color = x->parent->color;                                    // Caso 4
-      x->parent->color = BLACK;                                       // Caso 4
-      w->right->color = BLACK;                                        // Caso 4
-      leftRotate(tree, x->parent);                                    // Caso 4
+      w->color = x->parent->color;                                    // caso 4
+      x->parent->color = BLACK;                                       // caso 4
+      w->right->color = BLACK;                                        // caso 4
+      leftRotate(tree, x->parent);                                    // caso 4
     }
   } else {
     w = x->parent->left;                                              // w e' fratello di x
     if (w->color == RED) {
-      w->color = BLACK;                                               // Caso 1
-      x->parent->color = RED;                                         // Caso 1
-      rightRotate(tree, x->parent);                                   // Caso 1
-      w = x->parent->left;                                            // Caso 1
+      w->color = BLACK;                                               // caso 1
+      x->parent->color = RED;                                         // caso 1
+      rightRotate(tree, x->parent);                                   // caso 1
+      w = x->parent->left;                                            // caso 1
     }
     if (w->right->color == BLACK && w->left->color == BLACK) {
-      w->color = RED;                                                 // Caso 2
-      deleteFixup(tree, x->parent);                                   // Caso 2
+      w->color = RED;                                                 // caso 2
+      deleteFixup(tree, x->parent);                                   // caso 2
     } else {
       if (w->left->color == BLACK) {
-        w->right->color = BLACK;                                      // Caso 3
-        w->color = RED;                                               // Caso 3
-        leftRotate(tree, w);                                          // Caso 3
-        w = x->parent->left;                                          // Caso 3
+        w->right->color = BLACK;                                      // caso 3
+        w->color = RED;                                               // caso 3
+        leftRotate(tree, w);                                          // caso 3
+        w = x->parent->left;                                          // caso 3
       }
-      w->color = x->parent->color;                                    // Caso 4
-      x->parent->color = BLACK;                                       // Caso 4
-      w->left->color = BLACK;                                         // Caso 4
-      rightRotate(tree, x->parent);                                   // Caso 4
+      w->color = x->parent->color;                                    // caso 4
+      x->parent->color = BLACK;                                       // caso 4
+      w->left->color = BLACK;                                         // caso 4
+      rightRotate(tree, x->parent);                                   // caso 4
     }
   }
 }
