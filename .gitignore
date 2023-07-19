@@ -53,3 +53,6 @@ dkms.conf
 
 # VSCode files
 .vscode
+
+# Output file
+CercaPercorso
