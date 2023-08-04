@@ -10,27 +10,35 @@
 
   Il grafo contiene il numero totale dei suoi vertici numVertices e un vettore di vertici **adjLists (la cui dimensione è gestita dinamicamente tramite realloc).
   I vertici sono identificati da un numero intero che si riferisce alla relativa distanza della stazione.
-  I collegamenti tra i vertici sono gestiti dalle funzioni addEdge, (addAutoEdge controlla se la stazione può raggiungere altre stazioni, addStationEdge controlla se la stazione può essere raggiunta dalle altre).
-  I collegamenti che un singolo vertice ha con gli altri vertici sono presenti nel campo *next.
-  In particolare, *next è un vettore di interi contenente gli indici dei vertici relativi al vettore di vertici **adjLists.
-  Ecco un esempio: data adjLists = [10, 25, 20, 15], se il vertice 10 (di indice 0) è collegato con i vertici 15 e 20 (di indici 3 e 2), allora avrò graph->adjLists[0]->next = [3, 2].
+  I collegamenti tra i vertici sono gestiti dalle funzioni addCarEdge e addStationEdge, settando minNext e maxNext (bound),
+  addAutoEdge controlla se la stazione può raggiungere altre stazioni dopo che ho aggiunto/rimosso un'auto,
+  addStationEdge controlla se la stazione può essere raggiunta dalle altre quando aggiungo una stazione,
+  con l'accortezza di mantenere gli indici corretti (minNext e maxNext) quando si aggiungono/tolgono i vertici al grafo (stazioni).
+  I collegamenti direzionali che vanno da un vertice verso gli altri vertici sono presenti implicitamente nel campo maxNext (analogo per minNext),
+  dove sarà presente l'indice in **adjLists del vertice più distante che un vertice può raggiungere (se A raggiunge C e B sta tra A e C allora A raggiunge anche B).
+  Inoltre, ogni vertice avrà un array di int *prev che contiene tutti gli indici in **adjLists dei vertici da cui un vertice può essere raggiunto.
   Per la ricerca del cammino minimo è stato implementata la visita in ampiezza mediante l'algoritmo Breadth-First Search.
   In ausilio all'algoritmo è stata implementata una nuova struttura dati: la coda.
+  Una volta trovata la distanza minima dal nodo di partenza, parto dal vertice di arrivo e vado a ritroso cercando quelli che stanno a distanza -1 e così via,
+  fino a raggiungere quello a distanza 0 che è il nodo di partenza. Per fare ciò si sfrutta *prev.
 
   L'albero rosso-nero ha una radice "root" e una foglia "NIL" alla quale tutte le foglie sono collegate.
   Ogni nodo dell'albero ha un genitore "parent", un figlio sinistro "left" e un figlio destro "right",
   oltre che al suo valore identificativo (in questo caso l'autonomia dell'auto) e a un identificatore del colore (rosso o nero).
+  Dato un nodo, se scendo a sinistra trovo il minore, se scendo a destra invece il maggiore; inoltre con le regole
+  dei colori rosso/nero, si riesce a "bilanciare" l'albero da un punto di vista spaziale.
 */
 
 
 
+/* INCLUDES */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
 
-
+/* DEFINES */
 #define STAZIONEADD "aggiungi-stazione"                               // la funzionialità "aggiungi-stazione"
 #define STAZIONERM "demolisci-stazione"                               // la funzionialità "demolisci-stazione"
 #define AUTOADD "aggiungi-auto"                                       // la funzionialità "aggiungi-auto"
@@ -41,6 +49,8 @@
 #define BLACK false                                                   // un nodo nero di un albero rosso-nero corrisponde a false
 
 
+
+/* STRUCTS */
 
 /* CODA */
 typedef struct queue_ {
@@ -60,8 +70,10 @@ typedef struct vertex_ {
   struct tree_ *cars;                                                 // albero contenente le auto nel vertice
   Color color;                                                        // il colore del vertice utilizzato per l'algoritmo di ricerca
   int distance;                                                       // la distanza del vertice dal nodo di partenza nell'algoritmo di ricerca
-  int *next;                                                          // array contenente gli indici relativi ad adjLists dei vertici che posso raggiungere
-  int dimNext;                                                        // numero di vertici raggiungibili dal vertice, aka numero di elementi di **next
+  int maxNext;                                                        // indice del vertice di massima distanza verso dx della stazione che posso raggiungere
+  int minNext;                                                        // indice del vertice di massima distanza verso sx della stazione che posso raggiungere
+  int *prev;                                                          // array contenente gli indici relativi ad adjLists dei vertici da cui il vertice può essere raggiunto
+  int dimPrev;                                                        // numero di vertici da cui il vertice è raggiungibile, aka numero di elementi di *prev
 } vertex_t;
 
 typedef struct graph_ {
@@ -84,15 +96,15 @@ typedef struct node_ {
 
 
 
+/* FUNZIONI */
 graph_t* inGraph();                                                   // inizializza il grafo
 vertex_t* inVertex();                                                 // inizializza il vertice
 void printGraph(graph_t*);                                            // stampa a video il grafo
 int searchVertexOrdered(graph_t*, int);                               // cerca se nel grafo è presente un determinato vertice
 int insertGraphOrdered(graph_t*, vertex_t*);                          // inserisce un vertice nel grafo
 vertex_t* searchAndDeleteVertexOrdered(graph_t*, int);                // cerca ed elimina il vertice
-void addAutoEdge(graph_t*, node_t*, int);                             // aggiunge le frecce per connettere i vertici quando aggiungo un'auto (compila il campo *next nei vertici)
-void addStationEdge(graph_t*, int);                                   // aggiunge le frecce per connettere i vertici quando aggiungo una stazione (compila il campo *next nei vertici)
-void removeStationEdge(graph_t*, int);                                // rimuove le frecce per connettere i vertici quando rimuovo una stazione (compila il campo *next nei vertici)
+void addCarEdge(graph_t*, node_t*, int);                              // aggiunge le frecce per connettere i vertici quando aggiungo un'auto (compila minNext e maxNext del vertice dove ho aggiunto/rimosso l'auto)
+void addStationEdge(graph_t*, int);                                   // aggiunge le frecce per connettere i vertici quando aggiungo una stazione (compila minNext e maxNext degli altri vertici)
 void BFS(graph_t*, int);                                              // algoritmo di ricerca BFS
 void destroyGraph(graph_t*);                                          // elimina il grafo
 void destroyVertex(vertex_t*);                                        // elimina il vertice
@@ -117,12 +129,14 @@ void destroyTree (tree_t*, node_t*);                                  // elimina
 
 
 /* VARIABILI GLOBALI */
+int start, end;
 queue_t *q;
 
 
 
+/* MAIN START */
 int main (int argc, char *argv[]) {
-  int i, num, v_i, start, end;
+  int i, num, v_i, v_i2, dist;
   char c, *str_tmp, *token;
   graph_t *graph;
   vertex_t *vertex_tmp;
@@ -162,13 +176,16 @@ int main (int argc, char *argv[]) {
         vertex_tmp->cars = tree_tmp;
         for (i = num; i > 0; i--) {
           token = strtok(NULL, " ");                                  // SEPARO LA STRINGA DI INPUT PER PRENDERE L'AUTONOMIA DELL'AUTOMOBILE
-          num = atoi(token);                                          // CONVERTO IL NUMERO DA STRINGA A INTERO
+          v_i2 = atoi(token);                                         // CONVERTO IL NUMERO DA STRINGA A INTERO
           node_tmp = inNode();
-          node_tmp->key = num;
+          node_tmp->key = v_i2;
           insertTree(tree_tmp, node_tmp);                             // INSERISCO L'AUTO NELL'ALBERO
-          addAutoEdge(graph, node_tmp, v_i);                          // AGGIUNGO SE SERVE IL COLLEGAMENTO DAL VERTICE AGLI ALTRI VERTICI
         }
-        addStationEdge(graph, v_i);
+        if (num != 0) {                                               // AGGIUNGO SE SERVE IL COLLEGAMENTO DAL VERTICE AGLI ALTRI VERTICI
+          node_tmp = treeMaximum(graph->adjLists[v_i]->cars, graph->adjLists[v_i]->cars->root);
+          addCarEdge(graph, node_tmp, v_i);
+        }
+        addStationEdge(graph, v_i);                                   // CONTROLLO SE LA STAZIONE PUò ESSERE RAGGIUNTA DALLE ALTRE
         puts("aggiunta");                                             // STAMPO IN OUTPUT CHE LA STAZIONE È STATA AGGIUNTA
       } else {
         puts("non aggiunta");
@@ -197,7 +214,7 @@ int main (int argc, char *argv[]) {
         node_tmp->key = num;
         vertex_tmp = graph->adjLists[v_i];
         insertTree(vertex_tmp->cars, node_tmp);
-        addAutoEdge(graph, node_tmp, v_i);
+        addCarEdge(graph, node_tmp, v_i);
         puts("aggiunta");
       } else {
         puts("non aggiunta");
@@ -217,13 +234,12 @@ int main (int argc, char *argv[]) {
           free(node_tmp);
           if (graph->adjLists[v_i]->cars->root != graph->adjLists[v_i]->cars->NIL) {  // SE ESISTE ALMENO UN'ALTRA AUTO
             node_tmp = treeMaximum(graph->adjLists[v_i]->cars, graph->adjLists[v_i]->cars->root); // TROVO LA MACCHINA CON LA MAGGIOR AUTONOMIA
-            if (num > node_tmp->key) {                                // SE L'AUTO CHE HO RIMOSSO AVEVA UN'AUTONOMIA MAGGIORE RISPETTO ALLE ALTRE AUTO ALLORA FORZO LA RICOMPILAZIONE DEL CAMPO *NEXT
-              addAutoEdge(graph, node_tmp, v_i);
+            if (num > node_tmp->key) {                                // SE L'AUTO CHE HO RIMOSSO AVEVA UN'AUTONOMIA MAGGIORE RISPETTO ALLE ALTRE AUTO ALLORA FORZO LA RICOMPILAZIONE DEI COLLEGAMENTI TRA IL VERTICE E GLI ALTRI
+              addCarEdge(graph, node_tmp, v_i);
             }
           } else {                                                    // SE NON CI SONO PIÙ AUTO NELLA STAZIONE
-            free(graph->adjLists[v_i]->next);                         // NON POSSO PIÙ RAGGIUNGERE NESSUNA STAZIONE
-            graph->adjLists[v_i]->next = NULL;
-            graph->adjLists[v_i]->dimNext = 0;
+            graph->adjLists[v_i]->maxNext = -1;                       // NON POSSO PIÙ RAGGIUNGERE NESSUNA STAZIONE
+            graph->adjLists[v_i]->minNext = -1;
           }
           puts("rottamata");
         } else {
@@ -240,16 +256,19 @@ int main (int argc, char *argv[]) {
       if (v_i != -1) {
         token = strtok(NULL, " ");                                    // SEPARO LA STRINGA DI INPUT PER PRENDERE LA STAZIONE DI ARRIVO
         end = atoi(token);
-        if (searchVertexOrdered(graph, end) != -1) {
+        v_i2 = searchVertexOrdered(graph, end);
+        if (v_i2 != -1) {
           BFS(graph, v_i);
+          dist = graph->adjLists[v_i2]->distance;
+          for (i = 0, vertex_tmp = graph->adjLists[v_i]; dist == -1; i++) {
+            printf("%d ",vertex_tmp->key);
+          }
         } else {
           puts("nessun percorso");
         }
       } else {
         puts("nessun percorso");
-      }
-
-      
+      }    
     }
   }
   free(q);
@@ -260,6 +279,8 @@ int main (int argc, char *argv[]) {
 
 
 
+/* DEFINIZIONE DELLE FUNZIONI */
+
 /**
  * @brief inizializza il grafo
  * 
@@ -267,6 +288,7 @@ int main (int argc, char *argv[]) {
  */
 graph_t* inGraph() {
   graph_t *result;
+
   result = NULL;
   result = malloc(sizeof(graph_t));
   result->numVertices = 0;
@@ -281,10 +303,11 @@ graph_t* inGraph() {
  */
 vertex_t* inVertex() {
   vertex_t *result;
+
   result = NULL;
   result = malloc (sizeof(vertex_t));
-  result->next = NULL;
-  result->dimNext = 0;
+  result->maxNext = -1;
+  result->minNext = -1;
   return result;
 }
 
@@ -294,16 +317,17 @@ vertex_t* inVertex() {
  * @param graph il grafo
  */
 void printGraph(graph_t *graph) {
-  int i, j, v_i;
+  int i, j;
+
   for (i = 0; i < graph->numVertices; i++) {                          // scorro i vertici del grafo
     printf("Vertex %d\n: ", graph->adjLists[i]->key);                 // stampo il vertice nel grafo
-    j = 0;
-    while (j < graph->adjLists[i]->dimNext) {                         // scorro i vertici che un vertice può raggiungere
-      v_i = graph->adjLists[i]->next[j];                              // ricavo l'indice raggiungibile presente nel vettore *next
-      printf("%d -> ", graph->adjLists[v_i]->key);                    // stampo il corrispondente valore
-      j++;
+    for (j = graph->adjLists[i]->minNext; j != -1 && j <= graph->adjLists[i]->maxNext; j++) { // scorro i vertici che un vertice può raggiungere
+      if (i != j) {
+        printf("%d -> ", graph->adjLists[j]->key);                    // stampo il corrispondente valore
+      }
     }
     puts("");
+    //printf("MIN: %d - MAX: %d\n", graph->adjLists[i]->minNext, graph->adjLists[i]->maxNext);
   }
 }
 
@@ -317,6 +341,7 @@ void printGraph(graph_t *graph) {
 int searchVertexOrdered(graph_t *graph, int searchKey) {
   int i;
   vertex_t *currentVertex;
+
   if (graph->adjLists == NULL) {
     return -1;
   }
@@ -346,7 +371,8 @@ int searchVertexOrdered(graph_t *graph, int searchKey) {
  * @return int la posizione del vertice aggiunto della adjLists (il suo indice)
  */
 int insertGraphOrdered(graph_t *graph, vertex_t *vertex) {
-  int i, j, k;
+  int i, j;
+
   i = 0;
   if (graph->adjLists[i] == NULL) {                                   // se il grafo non ha vertici viene inserito in testa
     graph->adjLists[i] = vertex;
@@ -361,15 +387,22 @@ int insertGraphOrdered(graph_t *graph, vertex_t *vertex) {
     graph->numVertices++;
     return i;
   }
-  for (j = graph->numVertices; j > i; j--) {                          // se sono qua devo inserire il vertice in mezzo alla lista o in testa
-    graph->adjLists[j] = graph->adjLists[j-1];                        // sposto tutti i vertici a destra di uno fino alla posizione desiderata
-  }
-  graph->adjLists[i] = vertex;                                        // inserisco il vertice
-  graph->numVertices++;
-  for (j = 0; j < graph->numVertices; j++) {                          // fixo gli indici del campo next per via del loro ordine che può essere modificato (un vertice aggiunto o rimosso può far shiftare i vertici in adjLists)
-    for (k = 0; k < graph->adjLists[j]->dimNext; k++) {               // scorro *next per ciascun vertice
-      if (graph->adjLists[j]->next[k] >= i) {                         // se l'indice raggiungibile si riferisce a un vertice che è stato spostato a destra di uno, allora anche il suo indice deve incrementare
-        graph->adjLists[j]->next[k]++;
+  for (j = graph->numVertices; j >= 0; j--) {                         // se sono qua devo inserire il vertice in mezzo alla lista o in testa
+    if (j > i) {
+      graph->adjLists[j] = graph->adjLists[j-1];                      // sposto tutti i vertici a destra di uno fino alla posizione desiderata
+      graph->adjLists[j]->maxNext++;                                  // sistemo il limite superiore
+      if (graph->adjLists[j]->minNext >= i) {
+        graph->adjLists[j]->minNext++;                                // sistemo il limite inferiore
+      }
+    } else if (j == i) {
+      graph->adjLists[i] = vertex;                                    // inserisco il vertice
+      graph->numVertices++;
+    } else {
+      if (graph->adjLists[j]->maxNext >= i) {
+        graph->adjLists[j]->maxNext++;
+      }
+      if (graph->adjLists[j]->minNext >= i) {
+        graph->adjLists[j]->minNext++;                                // sistemo il limite inferiore
       }
     }
   }
@@ -377,7 +410,7 @@ int insertGraphOrdered(graph_t *graph, vertex_t *vertex) {
 }
 
 /**
- * @brief cerca ed elimina il vertice dal grafo, chiama la funzione che gestisce i collegamenti dei vertici dopo la rimozione di una stazione
+ * @brief cerca ed elimina il vertice dal grafo mantenendo l'ordine
  * 
  * @param graph il grafo
  * @param searchKey la chiave nel vertice da eliminare
@@ -386,6 +419,7 @@ int insertGraphOrdered(graph_t *graph, vertex_t *vertex) {
 vertex_t* searchAndDeleteVertexOrdered(graph_t *graph, int searchKey) {
   int i, j;
   vertex_t *vertex;
+
   i = 0;
   while (i < graph->numVertices && graph->adjLists[i]->key <= searchKey) {// cerco il vertice da eliminare
     if (graph->adjLists[i]->key == searchKey) {
@@ -402,36 +436,62 @@ vertex_t* searchAndDeleteVertexOrdered(graph_t *graph, int searchKey) {
   vertex = graph->adjLists[i];                                        // se ho trovato il vertice da eliminare
   if (i == graph->numVertices-1) {                                    // se il vertice da eliminare è la coda del grafo
     graph->adjLists[i] = NULL;
+    for (j = 0; j < graph->numVertices-1; j++) {                      // sistemo maxNext
+      if (graph->adjLists[j]->maxNext == i) {
+        graph->adjLists[j]->maxNext--; 
+      }                               
+    }
   } else {                                                            // se il vertice da eliminare è in mezzo o se è la testa
-    for (j = i; j < graph->numVertices-1; j++) {                      // sposto tutti i vertici a sinistra di uno
-      graph->adjLists[j] = graph->adjLists[j+1];
+    for (j = 0; j < graph->numVertices-1; j++) {                      // parto da 0 per fixare maxNext
+      if (j < i) {
+        if (graph->adjLists[j]->maxNext >= i) {
+          graph->adjLists[j]->maxNext--;
+        }
+      } else {                                                        // arrivato a i, sposto anche i vertici a sinistra di uno
+        graph->adjLists[j] = graph->adjLists[j+1];                    // sposto tutti i vertici a sinistra di uno
+        if (graph->adjLists[j]->maxNext >= i) {
+          graph->adjLists[j]->maxNext--;
+        }
+        if (graph->adjLists[j]->minNext > i) {                        // sistemo minNext
+          graph->adjLists[j]->minNext--;                                
+        }
+      }
     }
   }
   graph->numVertices--;
-  removeStationEdge(graph, i);
   return vertex;
 }
 
 /**
- * @brief aggiunge uno o più collegamenti tra due vertici quando aggiungo un'auto
+ * @brief aggiunge uno o più collegamenti tra due vertici quando aggiungo un'auto, settando prima maxNext, poi minNext, infine compilando *prev
  * 
  * @param graph il grafo
  * @param car l'auto inserita
  * @param v_i l'indice del vertice dove l'auto è situata
  */
-void addAutoEdge(graph_t *graph, node_t *car, int v_i) {
+void addCarEdge(graph_t *graph, node_t *car, int v_i) {
   int i, curr_distance;
+  bool found;
+
   if (treeMaximum(graph->adjLists[v_i]->cars, graph->adjLists[v_i]->cars->root) == car) { // se l'auto che aggiungo ha un'autonomia maggiore rispetto a quelle che ho già allora posso aggiungere gli archi
-    if (graph->adjLists[v_i]->next != NULL) {                         // prima di ricompilare le stazioni raggiungibili dalla nuova auto, elimino quello che c'era prima
-      free(graph->adjLists[v_i]->next);
-      graph->adjLists[v_i]->next = NULL;
-      graph->adjLists[v_i]->dimNext = 0;
+    curr_distance = graph->adjLists[v_i]->key;
+    for (i = graph->numVertices-1, found = false; i >= 0 && !found; i--) {  // scorro i vertici nel grafo
+      if (car->key >= abs(graph->adjLists[i]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
+        graph->adjLists[v_i]->maxNext = i;                            // mi salvo l'indice relativo all'adjLists del vertice massimo a dx che posso raggiungere 
+        found = true;
+      }
     }
-    for (i = 0, curr_distance = graph->adjLists[v_i]->key; i < graph->numVertices; i++) { // scorro i vertici nel grafo
-      if (i != v_i && car->key >= abs(graph->adjLists[i]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
-        graph->adjLists[v_i]->dimNext++;
-        graph->adjLists[v_i]->next = realloc(graph->adjLists[v_i]->next, sizeof(int) * graph->adjLists[v_i]->dimNext);  // alloco dinamicamente lo spazio al campo *next del vertice che sto elaborando
-        graph->adjLists[v_i]->next[graph->adjLists[v_i]->dimNext - 1] = i;  // mi salvo l'indice relativo all'adjLists del vertice che posso raggiungere
+    for (i = 0, found = false; i <= graph->adjLists[v_i]->maxNext && !found; i++) { // scorro i vertici nel grafo
+      if (car->key >= abs(graph->adjLists[i]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
+        graph->adjLists[v_i]->minNext = i;                            // mi salvo l'indice relativo all'adjLists del vertice massimo a sx che posso raggiungere 
+        found = true;
+      }
+    }
+    for (i = graph->adjLists[v_i]->minNext; i != -1 && i <= graph->adjLists[v_i]->maxNext; i++) {  // qua compilo invece dimPrev rimanendo nel bound di vertici raggiungibili che ho trovato
+      if (i != v_i) {
+        graph->adjLists[i]->dimPrev++;
+        graph->adjLists[i]->prev = realloc(graph->adjLists[i]->prev, sizeof(int) * graph->adjLists[i]->dimPrev);  // alloco dinamicamente lo spazio al campo *prev del vertice che può essere raggiunto dal vertice che sto elaborando
+        graph->adjLists[i]->prev[graph->adjLists[i]->dimPrev - 1] = v_i;  // mi salvo l'indice relativo all'adjLists del vertice che è raggiunto
       }
     }
   }
@@ -444,56 +504,19 @@ void addAutoEdge(graph_t *graph, node_t *car, int v_i) {
  * @param v_i l'indice del vertice (stazione) aggiunto
  */
 void addStationEdge(graph_t *graph, int v_i) {
-  int i, j, k;
-  node_t *node;
+  int i;                                                              // l'indice corrispondente alla stazione
+  node_t *node;                                                       // l'auto di autonomia massima presente nella stazione
+
   for (i = 0; i < graph->numVertices; i++) {                          // scorro tra i vertici del grafo
-    if (i != v_i) {                                                   // non prendo in considerazione il vertice stesso appena aggiunto
+    if (i != v_i && graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // se il vertice che elaboro è diverso da quello che ho appena aggiunto e se contiene almeno un'auto
       node = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root); // prendo l'auto con la massima autonomia
       if (node->key >= abs(graph->adjLists[i]->key - graph->adjLists[v_i]->key)) {  // controllo se posso raggiungere la stazione i da v_i
-        for (j = 0; graph->adjLists[i]->next != NULL && graph->adjLists[i]->next[j] < v_i && j < graph->adjLists[i]->dimNext; j++); // cerco l'indice per inserire v_i
-        if (j == graph->adjLists[i]->dimNext) {                       // se devo inserire nella coda del vettore next
-          graph->adjLists[i]->dimNext++;
-          graph->adjLists[i]->next = realloc(graph->adjLists[i]->next, sizeof(int) * graph->adjLists[i]->dimNext);  // alloco dinamicamente lo spazio al campo *next del vertice che sto elaborando
-          graph->adjLists[i]->next[j] = v_i;                          // inserisco l'indice relativo all'adjLists del vertice che posso raggiungere
-        } else {                                                      // se devo inserire in mezzo al vettore next
-          graph->adjLists[i]->dimNext++;
-          graph->adjLists[i]->next = realloc(graph->adjLists[i]->next, sizeof(int) * graph->adjLists[i]->dimNext);  // alloco dinamicamente lo spazio al campo *next del vertice che sto elaborando
-          for (k = graph->adjLists[i]->dimNext; k > j; k--) {
-            graph->adjLists[i]->next[k] = graph->adjLists[i]->next[k-1];
-          }
-          graph->adjLists[i]->next[j] = v_i;                          // inserisco l'indice relativo all'adjLists del vertice che posso raggiungere
+        if (graph->adjLists[i]->minNext == -1 || v_i < graph->adjLists[i]->minNext) { // se non ho ancora settato minNext o se la stazione è precedente a minNext allora aggiorno minNext
+          graph->adjLists[i]->minNext = v_i;
         }
-      }
-    }
-  }
-}
-
-/**
- * @brief gestisce i collegamenti tra i vertici dopo la rimozione di una stazione
- * 
- * @param graph il grafo
- * @param i l'indice nell'adjLists del vertice appena eliminato
- */
-void removeStationEdge(graph_t *graph, int i) {
-  int j, k;
-  bool flag;
-  for (j = 0; j < graph->numVertices; j++) {                          // fixo gli indici del campo next per via del loro ordine che può essere modificato (un vertice aggiunto o rimosso può far shiftare i vertici in adjLists)
-    for (k = 0, flag = false; k < graph->adjLists[j]->dimNext; k++) { // scorro *next per ciascun vertice
-      if (graph->adjLists[j]->next[k] == i) {                         // se l'indice di un vertice raggiungibile corrisponde all'indice in adjLists del vertice eliminato, scorro tutti i *next a sinistra di uno e rialloco lo spazio (attivando il flag)
-        flag = true;
-      }
-      if (graph->adjLists[j]->next[k] >= i) {                         // se l'indice raggiungibile si riferisce a un vertice che è stato spostato a sinistra di uno, allora anche il suo indice deve decrementare
-        if (flag && k < graph->adjLists[j]->dimNext-1) {              // se ho un indice a eliminare allora flag va true e shifto
-          graph->adjLists[j]->next[k] = graph->adjLists[j]->next[k+1];
+        if (graph->adjLists[i]->maxNext == -1 || v_i > graph->adjLists[i]->maxNext) {  // se non ho ancora settato maxNext o se la stazione è successiva a maxNext allora aggiorno maxNext
+          graph->adjLists[i]->maxNext = v_i;
         }
-        graph->adjLists[j]->next[k]--;                                // comunque fixo l'indice se ho modificato l'ordine
-      }
-    }
-    if (flag) {
-      graph->adjLists[j]->dimNext--;
-      graph->adjLists[j]->next = realloc(graph->adjLists[j]->next, sizeof(int) * graph->adjLists[j]->dimNext);  // alloco dinamicamente lo spazio al campo *next del vertice che sto elaborando
-      if (graph->adjLists[j]->dimNext == 0) {
-        graph->adjLists[j]->next = NULL;
       }
     }
   }
@@ -507,7 +530,9 @@ void removeStationEdge(graph_t *graph, int i) {
  */
 void BFS(graph_t *graph, int v_i) {
   int i;
+  bool flag;                                                          // se esamino la distanza del vertice di destinazione non devo controllare gli altri vertici
   vertex_t *vertex, *v;
+
   for (i = 0, vertex = graph->adjLists[v_i]; i < graph->numVertices; i++) {
     if (graph->adjLists[i] != vertex) {
       graph->adjLists[i]->color = WHITE;
@@ -518,14 +543,21 @@ void BFS(graph_t *graph, int v_i) {
   vertex->distance = 0;
   inQueue();
   enqueue(vertex);
-  while (q->length > 0) {
+  flag = false;
+  while (q->length > 0 && !flag) {
     vertex = dequeue();
-    for (i = 0; i < vertex->dimNext; i++) {
-      v = graph->adjLists[vertex->next[i]];
-      if (v->color == WHITE) {
-        v->color = GREY;
-        v->distance = (vertex->distance) + 1;
-        enqueue(v);
+    for (i = vertex->minNext; i <= vertex->maxNext; i++) {
+      if (i != v_i) {
+        v = graph->adjLists[i];
+        if (v->color == WHITE) {
+          v->color = GREY;
+          v->distance = (vertex->distance) + 1;
+          if (v->key == end) {
+            flag = true;
+            break;
+          }
+          enqueue(v);
+        }
       }
     }
     vertex->color = DARK;
@@ -539,6 +571,7 @@ void BFS(graph_t *graph, int v_i) {
  */
 void destroyGraph(graph_t *graph) {
   int i;
+
   for (i = 0; i < graph->numVertices; i++) {
     destroyVertex(graph->adjLists[i]);
   }
@@ -555,8 +588,8 @@ void destroyGraph(graph_t *graph) {
  */
 void destroyVertex(vertex_t *vertex) {
   destroyTree(vertex->cars, vertex->cars->root);
-  if (vertex->dimNext > 0) {
-    free(vertex->next);
+  if (vertex->dimPrev > 0) {
+    free(vertex->prev);
   }
   free(vertex);
 }
@@ -578,6 +611,7 @@ void inQueue() {
  */
 void printQueue() {
   int i;
+
   puts("QUEUE");
   for (i = 0; i < q->length; i++) {
     printf("Data %d: %d\n", i, q->data[i]->key);
@@ -604,6 +638,7 @@ void enqueue(vertex_t *x) {
 vertex_t* dequeue() {
   int i;
   vertex_t *x;
+
   if (q->head == q->tail) {
     puts("error underflow");
     return NULL;
@@ -625,6 +660,7 @@ vertex_t* dequeue() {
  */
 tree_t* inTree () {
   tree_t *result;
+
   result = NULL;
   result = malloc (sizeof(tree_t));
   result->root = NULL;
@@ -641,6 +677,7 @@ tree_t* inTree () {
  */
 node_t* inNode () {
   node_t *result;
+
   result = NULL;
   result = malloc (sizeof(node_t));
   result->color = BLACK;
@@ -858,6 +895,7 @@ node_t* searchAndDeleteNode (tree_t *tree, node_t *z, int newKey) {
  */
 void deleteFixup (tree_t *tree, node_t *x) {
   node_t *w;
+
   if (x->color == RED || x->parent == tree->NIL) {
     x->color = BLACK;                                                 // caso 0
   } else if (x == x->parent->left) {                                  // x e' figlio sinistro
@@ -918,6 +956,7 @@ void deleteFixup (tree_t *tree, node_t *x) {
  */
 node_t* treeSuccessor(tree_t *tree, node_t *x) {
   node_t *y;
+
   if (x->right != tree->NIL) {
     return treeMinimum(tree, x->right);
   }
@@ -978,7 +1017,12 @@ void destroyTree (tree_t *tree, node_t *x) {
   }
 }
 
-// TODO
-// Ricontrolla destroyTree(). Dovrebbe essere giusta.
-// La searchAndDeleteNode() è giusta? E la deleteFixup()? Dovrebbero essere giuste.
-// Implementare uno scorrimento iterativo in un albero con *next è più efficiente per eliminarlo nella destroyTree()?
+/* TODO
+  Implementa *prev.
+  Implementa l'algoritmo pianifica-percorso facendo che BFS() tiene traccia dei vertici visitati in una lista apposita (da implementare),
+  poi partendo dal nodo di arrivo vai a vedere in quella lista quale ha distanza -1 a ritroso tramite *prev
+  Forse si può evitare la addStationEdge() e aggiungere i link nella insertGraphOrdered().
+  Ricontrolla destroyTree(). Dovrebbe essere giusta.
+  La searchAndDeleteNode() è giusta? E la deleteFixup()? Dovrebbero essere giuste.
+  Implementare uno scorrimento iterativo in un albero con *next è più efficiente per eliminarlo nella destroyTree()?
+*/
