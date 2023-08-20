@@ -354,6 +354,7 @@ int main () {
   }
   
 /* IL PROGRAMMA TERMINA */
+/*
   if (q != NULL) {                                                    // LIBERO LA CODA
     if (q->data != NULL) {
       free(q->data);
@@ -365,7 +366,7 @@ int main () {
   str_tmp = NULL;
   destroyGraph(graph);                                                // LIBERO IL GRAFO
   graph = NULL;
-
+*/
   return 0;
 }
 
@@ -662,9 +663,9 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
         graph->adjLists[i]->distance = 0;
       }
       if (i != v_i2) {                                                // setto maxNext
-        car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
         flag = false;
-        if (car != graph->adjLists[i]->cars->NIL) {                   // controllo se effettivamente esiste un'auto nella stazione
+        if (graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // controllo se esiste un'auto nella stazione
+          car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
           curr_distance = graph->adjLists[i]->key;
           for (j = v_i2; j > i && !flag; j--) {                       // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
             if (car->key >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
@@ -690,11 +691,11 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
         graph->adjLists[i]->distance = 0;
       }
       if (i != v_i2) {                                                // setto minNext
-        car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
         flag = false;
-        if (car != graph->adjLists[i]->cars->NIL) {                   // controllo se effettivamente esiste un'auto nella stazione
+        if (graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // controllo se esiste un'auto nella stazione
+          car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
           curr_distance = graph->adjLists[i]->key;
-          for (j = v_i2; j < i && !flag; j++) {         // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
+          for (j = v_i2; j < i && !flag; j++) {                       // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
             if (car->key >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
               graph->adjLists[i]->minNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a sx che posso raggiungere 
               flag = true;
@@ -766,45 +767,45 @@ void pianificaPercorso(list_t **visited, list_t **result) {
   vertex_t *vertex_tmp;
   list_t *list_tmp;
 
-  vertex_tmp = (*visited)->data;                                      // PARTO DALLA STAZIONE DI ARRIVO E PROCEDO A RITROSO CERCANDO IL VERTICE A DISTANZA -1
+  vertex_tmp = (*visited)->data;                                      // parto dalla stazione di arrivo e procedo a ritroso cercando il vertice a distanza -1
   (*result) = insertList((*result), vertex_tmp);
   dist = vertex_tmp->distance;
   flag = false;
-  for (list_tmp = (*visited)->next; list_tmp != NULL; list_tmp = list_tmp->next) {  // CONTROLLO TUTTI I POSSIBILI PERCORSI A RITROSO
-    if (start < end) {                                                // SE IL PERCORSO È VERSO DESTRA
-      if (list_tmp->data->distance < dist && list_tmp->data->key < (*result)->data->key) { // SE LA DISTANZA SCENDE DI UNO E IL VERTICE SI TROVA A SINISTRA DELL'ALTRO, HO TROVATO QUELLO PIÙ VELOCE
-        if ((*result)->data->i <= list_tmp->data->maxNext && flag == false) { // CONTROLLO SE IL PIÙ VELOCE È RAGGIUNGIBILE
+  for (list_tmp = (*visited)->next; list_tmp != NULL; list_tmp = list_tmp->next) {  // controllo tutti i possibili percorsi a ritroso
+    if (start < end) {                                                // se il percorso è verso destra
+      if (list_tmp->data->distance < dist && list_tmp->data->key < (*result)->data->key) { // se la distanza scende di uno e il vertice si trova a sinistra dell'altro, ho trovato quello più veloce
+        if ((*result)->data->i <= list_tmp->data->maxNext && flag == false) { // controllo se il più veloce è raggiungibile
           vertex_tmp = list_tmp->data;
           flag = true;
         } else if (flag == true && list_tmp->data->key < vertex_tmp->key && (*result)->data->i <= list_tmp->data->maxNext) {
-          vertex_tmp = list_tmp->data;                                // SE NON È IL PRIMO CHE TROVO ED È PIÙ VICINO ALL'AUTOSTRADA RISPETTO A QUELLO PRECEDENTEMENTE TROVATO ED È RAGGIUNGIBILE, ALLORA DEVO AGGIORNARE
+          vertex_tmp = list_tmp->data;                                // se non è il primo che trovo ed è più vicino all'autostrada rispetto a quello precedentemente trovato ed è raggiungibile, allora devo aggiornare
         }
-        if (list_tmp->data->key == start || (vertex_tmp->distance > list_tmp->next->data->distance && flag == true)) { // SE SONO ARRIVATO ALLA FINE ENTRO, ALTRIMENTI SE ESISTONO VERTICI SUCCESSIVI CON LA STESSA DISTRANZA ALLORA PRENDO I SUCCESSIVI E SALTO QUESTO PASSAGGIO
+        if (list_tmp->data->key == start || (vertex_tmp->distance > list_tmp->next->data->distance && flag == true)) { // se sono arrivato alla fine entro, altrimenti se esistono vertici successivi con la stessa distanza prendo i successivi e salto questo passaggio
           dist--;
-          (*result) = insertList((*result), vertex_tmp);              // LO INSERISCO NEL RISULTATO
+          (*result) = insertList((*result), vertex_tmp);              // lo inserisco nel risultato
           flag = false;
         }
       }
-    } else {                                                          // SE IL PERCORSO È VERSO SINISTRA
-      if (list_tmp->data->distance < dist && list_tmp->data->key > (*result)->data->key) { // SE LA DISTANZA SCENDE DI UNO E IL VERTICE SI TROVA A DESTRA DELL'ALTRO, HO TROVATO QUELLO PIÙ VELOCE
-        if ((*result)->data->i >= list_tmp->data->minNext && list_tmp->data->minNext != -1 && flag == false) { // CONTROLLO SE IL PIÙ VELOCE È RAGGIUNGIBILE E SE È IL PRIMO CHE TROVO
+    } else {                                                          // se il percorso è verso sinistra
+      if (list_tmp->data->distance < dist && list_tmp->data->key > (*result)->data->key) { // se la distanza scende di uno e il vertice si trova a destra dell'altro, ho trovato quello più veloce
+        if ((*result)->data->i >= list_tmp->data->minNext && list_tmp->data->minNext != -1 && flag == false) { // controllo se il più veloce è raggiungibile e se è il primo che trovo
           vertex_tmp = list_tmp->data;
-          flag = true;                                                // SE AGGIORNO VERTEX_TMP POTRÒ ENTRARE NELL'INSERIMENTO
-        } else if (flag == true && list_tmp->data->key < vertex_tmp->key && (*result)->data->i >= list_tmp->data->minNext && list_tmp->data->minNext != -1) { // SE NON È IL PRIMO CHE TROVO ED È PIÙ VICINO ALL'AUTOSTRADA RISPETTO A QUELLO PRECEDENTEMENTE TROVATO ED È RAGGIUNGIBILE, ALLORA DEVO AGGIORNARE
+          flag = true;                                                // se aggiorno vertex_tmp potrò entrare nell'inserimento
+        } else if (flag == true && list_tmp->data->key < vertex_tmp->key && (*result)->data->i >= list_tmp->data->minNext && list_tmp->data->minNext != -1) { // se non è il primo che trovo ed è più vicino all'autostrada rispetto a quello precedentemente trovato ed è raggiungibile, allora devo aggiornare
           vertex_tmp = list_tmp->data;
         }
-        if (list_tmp->data->key == start || (vertex_tmp->distance > list_tmp->next->data->distance && flag == true)) { // SE SONO ARRIVATO ALLA FINE ENTRO, ALTRIMENTI SE ESISTONO VERTICI SUCCESSIVI CON LA STESSA DISTRANZA ALLORA PRENDO I SUCCESSIVI E SALTO QUESTO PASSAGGIO
+        if (list_tmp->data->key == start || (vertex_tmp->distance > list_tmp->next->data->distance && flag == true)) { // se sono arrivato alla fine entro, altrimenti se esistono vertici successivi con la stessa distanza prendo i successivi e salto questo passaggio
           dist--;
-          (*result) = insertList((*result), vertex_tmp);              // LO INSERISCO NEL RISULTATO
+          (*result) = insertList((*result), vertex_tmp);              // lo inserisco nel risultato
           flag = false;
         }
       }
     }
-    free((*visited));                                                 // LIBERO LA MEMORIA DEI VISITATI MAN MANO CHE SCORRO
+    free((*visited));                                                 // libero la memoria dei visitati man mano che scorro
     (*visited) = NULL;
     (*visited) = list_tmp;
   }
-  free((*visited));                                                   // LIBERO L'ULTIMO ELEMENTO DELLA LISTA DEI VISITATI
+  free((*visited));                                                   // libero l'ultimo elemento dalla lista dei visitati
   (*visited) = NULL;
 }
 
