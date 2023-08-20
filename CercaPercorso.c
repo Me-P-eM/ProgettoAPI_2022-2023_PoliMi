@@ -655,6 +655,7 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
   
   if (start < end) {                                                  // se nel cammino devo andare verso destra allora prendo i vertici che stanno a destra del vertice
     for (i = v_i; i <= v_i2; i++) {
+      graph->adjLists[i]->maxNext = -1;
       if (i != v_i) {
         graph->adjLists[i]->color = WHITE;
         graph->adjLists[i]->distance = -1;
@@ -663,26 +664,22 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
         graph->adjLists[i]->distance = 0;
       }
       if (i != v_i2) {                                                // setto maxNext
-        flag = false;
         if (graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // controllo se esiste un'auto nella stazione
           car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
           curr_distance = graph->adjLists[i]->key;
-          for (j = v_i2; j > i && !flag; j--) {                       // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
+          for (j = i + 1, flag = true; j <= v_i2 && flag; j++) {      // scorro i vertici nel grafo rimanendo nel range che sta tra il vertice che sto elaborando e l'arrivo
             if (car->key >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
               graph->adjLists[i]->maxNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a dx che posso raggiungere 
-              flag = true;
+            } else {                                                  // se non posso raggiunngere la stazione successiva setto flag a false
+              flag = false;
             }
           }
         }
-        if (!flag) {                                                  // se non ho trovato vertici raggiungibili lo setto
-          graph->adjLists[i]->maxNext = -1;
-        }
-      } else {                                                        // l'arrivo lo setto che non può raggiungere altri vertici
-        graph->adjLists[i]->maxNext = -1;
       }
     }
   } else {                                                            // se nel cammino devo andare verso sinistra allora prendo i vertici che stanno a sinistra del vertice
     for (i = v_i; i >= v_i2; i--) {
+      graph->adjLists[i]->minNext = -1;
       if (i != v_i) {
         graph->adjLists[i]->color = WHITE;
         graph->adjLists[i]->distance = -1;
@@ -691,22 +688,17 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
         graph->adjLists[i]->distance = 0;
       }
       if (i != v_i2) {                                                // setto minNext
-        flag = false;
         if (graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // controllo se esiste un'auto nella stazione
           car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
           curr_distance = graph->adjLists[i]->key;
-          for (j = v_i2; j < i && !flag; j++) {                       // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
+          for (j = i - 1, flag = true; j >= v_i2 && flag; j--) {      // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
             if (car->key >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
               graph->adjLists[i]->minNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a sx che posso raggiungere 
-              flag = true;
+            } else {                                                  // se non posso raggiunngere la stazione successiva setto flag a false
+              flag = false;
             }
           }
         }
-        if (!flag) {                                                  // se non ho trovato vertici setto che non può andare da nessuna parte
-          graph->adjLists[i]->minNext = -1;
-        }
-      } else {                                                        // l'arrivo lo setto che non può raggiungere altri vertici
-        graph->adjLists[i]->minNext = -1;
       }
     }
   }
