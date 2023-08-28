@@ -59,6 +59,14 @@ typedef struct list_ {
 
 
 
+/* LINKED LIST 2 */
+typedef struct list2_ {
+  int data;                                                           // autonomia dell'auto
+  struct list2_ *next;                                                // puntatore all'elemento successivo della lista
+} list2_t;
+
+
+
 /* CODA */
 typedef struct queue_ {
   struct vertex_ **data;                                              // dati contenuti nella coda (vertici)
@@ -72,7 +80,8 @@ typedef enum {WHITE, GREY, DARK} Color;
 
 typedef struct vertex_ {
   int key;                                                            // valore chiave identificativo del vertice (distanza della stazione)
-  struct tree_ *cars;                                                 // albero contenente le auto nel vertice
+  struct list2_ *cars;                                                // lista contenente le auto nel vertice
+  int maxCar;                                                         // l'auto con la massima autonomia
   Color color;                                                        // il colore del vertice utilizzato per l'algoritmo di ricerca
   int distance;                                                       // la distanza del vertice dal nodo di partenza nell'algoritmo di ricerca
   int maxNext;                                                        // indice del vertice di massima distanza verso dx della stazione che posso raggiungere
@@ -102,16 +111,18 @@ typedef struct node_ {
 
 /* FUNZIONI */
 list_t* insertList(list_t*, vertex_t*);                               // inserisce un elemento alla lista in testa
+list2_t* insertList2(list2_t*, int);                                  // inserisce un elemento alla lista in testa
+bool searchAndDeleteList2(list2_t**, vertex_t*, int);                 // cerca ed elimina un elemento nella lista
 void viewList(list_t*);                                               // stampa a video la lista
+void viewList2(list2_t*);                                             // stampa a video la lista
 list_t* clearList(list_t*);                                           // distrugge la lista e i suoi elementi
+list2_t* clearList2(list2_t*);                                        // distrugge la lista e i suoi elementi
 graph_t* inGraph();                                                   // inizializza il grafo
 vertex_t* inVertex(int);                                              // inizializza il vertice
 void printGraph(graph_t*);                                            // stampa a video il grafo
 int searchVertexOrdered(graph_t*, int);                               // cerca se nel grafo è presente un determinato vertice
 int searchAndInsertGraphOrdered(graph_t*, int);                       // inserisce un vertice nel grafo
 bool searchAndDeleteVertexOrdered(graph_t*, int);                     // cerca ed elimina il vertice
-void addCarEdge(graph_t*, node_t*, int);                              // aggiunge le frecce per connettere i vertici quando aggiungo un'auto (compila minNext e maxNext del vertice dove ho aggiunto/rimosso l'auto)
-void addStationEdge(graph_t*, int);                                   // aggiunge le frecce per connettere i vertici quando aggiungo una stazione (compila minNext e maxNext degli altri vertici)
 list_t* BFS(graph_t*, int, int);                                      // algoritmo di ricerca BFS
 void pianificaPercorso(list_t**, list_t**);                           // cerca il cammino minimo data una lista di stazioni con le relative distanze dal punto di partenza
 void destroyGraph(graph_t*);                                          // elimina il grafo
@@ -150,8 +161,6 @@ int main () {
   char c, *str_tmp;
   graph_t *graph;
   vertex_t *vertex_tmp;
-  tree_t *tree_tmp;
-  node_t *node_tmp;
   list_t *list_tmp, *visited, *result;
 
 /* OPERAZIONI PRELIMINARI */
@@ -198,8 +207,6 @@ int main () {
         }
         *(str_tmp+i) = '\0';                                          // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
         num = atoi(str_tmp);                                          // CONVERTO IL NUMERO DI AUTO DA STRINGA A INTERO
-        tree_tmp = inTree();
-        vertex_tmp->cars = tree_tmp;
         for (j = num; j > 0; j--) {
           i = 0;                                                      // <- QUI CONTINUA L'ACQUISIZIONE DELLA STRINGA
           c = getchar_unlocked();
@@ -210,8 +217,10 @@ int main () {
           }
           *(str_tmp+i) = '\0';                                        // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
           v_i2 = atoi(str_tmp);                                       // CONVERTO L'AUTONOMIA DELL'AUTO DA STRINGA A INTERO
-          node_tmp = inNode(v_i2);
-          insertTree(tree_tmp, node_tmp);                             // INSERISCO L'AUTO NELL'ALBERO
+          vertex_tmp->cars = insertList2(vertex_tmp->cars, v_i2);     // INSERISCO L'AUTO NELLA LISTA
+          if (vertex_tmp->maxCar < v_i2) {                            // SE AGGIUNGO UN'AUTO CON AUTONOMIA MAGGIORE RISPETTO A QUELLA MASSIMA CHE HO ALLORA AGGIORNO
+            vertex_tmp->maxCar = v_i2;
+          }
         }
         puts("aggiunta");                                             // STAMPO IN OUTPUT CHE LA STAZIONE È STATA AGGIUNTA
       } else {
@@ -256,9 +265,11 @@ int main () {
         }
         *(str_tmp+i) = '\0';                                          // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
         num = atoi(str_tmp);                                          // CONVERTO L'AUTONOMIA DELL'AUTO DA STRINGA A INTERO
-        node_tmp = inNode(num);
         vertex_tmp = graph->adjLists[v_i];
-        insertTree(vertex_tmp->cars, node_tmp);
+        vertex_tmp->cars = insertList2(vertex_tmp->cars, num);
+        if (vertex_tmp->maxCar < num) {                               // SE AGGIUNGO UN'AUTO CON AUTONOMIA MAGGIORE RISPETTO A QUELLA MASSIMA CHE HO ALLORA AGGIORNO
+          vertex_tmp->maxCar = num;
+        }
         puts("aggiunta");
       } else {
         while ((c = getchar_unlocked()) != '\n' && c != EOF);         // "PULISCO" IL BUFFER DI INPUT
@@ -287,10 +298,7 @@ int main () {
         *(str_tmp+i) = '\0';                                          // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
         num = atoi(str_tmp);                                          // CONVERTO L'AUTONOMIA DELL'AUTO DA STRINGA A NUMERO INTERO
         vertex_tmp = graph->adjLists[v_i];
-        node_tmp = searchAndDeleteNode(vertex_tmp->cars, vertex_tmp->cars->root, num);
-        if (node_tmp != vertex_tmp->cars->NIL) {
-          free(node_tmp);
-          node_tmp = NULL;
+        if (searchAndDeleteList2(&vertex_tmp->cars, vertex_tmp, num)) {
           puts("rottamata");
         } else {
           puts("non rottamata");
@@ -378,7 +386,7 @@ int main () {
  * @brief inserisce in testa alla lista un elemento
  * 
  * @param h la testa della lista
- * @param vertex 
+ * @param vertex il vertice da inserire nella lista
  * @return lista_t* la lista aggiornata con l'elemento appena aggiunto
  */
 list_t* insertList(list_t *h, vertex_t *vertex) {
@@ -389,6 +397,99 @@ list_t* insertList(list_t *h, vertex_t *vertex) {
   tmp->next = h;
   h = tmp;
   return h;
+}
+
+/**
+ * @brief inserisce in testa alla lista un elemento
+ * 
+ * @param h la testa della lista
+ * @param num l'autonomia dell'auto da inserire
+ * @return lista2_t* la lista aggiornata con l'elemento appena aggiunto
+ */
+list2_t* insertList2(list2_t *h, int num) {
+  list2_t *tmp;
+
+  tmp = malloc(sizeof(list2_t));
+  tmp->data = num;
+  tmp->next = h;
+  h = tmp;
+  return h;
+}
+
+/**
+ * @brief cerca se è presente l'autonomia dell'auto da eliminare
+ * 
+ * @param head la testa della lista
+ * @param vertex la stazione che contiene l'auto da rottamare
+ * @param num l'autonomia da eliminare
+ * @return bool l'esito dell'eliminazione 
+ */
+bool searchAndDeleteList2(list2_t **head, vertex_t *vertex, int num) {
+  list2_t *current;
+  list2_t *prev;
+  if (*head == NULL)
+    return false;
+  current = *head;
+  prev = NULL;
+  if (num > vertex->maxCar) {                                         // se l'auto da cercare ha un'autonomia più alta dell'auto con autonomia massima presente nella stazione allora non esiste
+    return false;
+  }
+  if (num == vertex->maxCar) {                                        // se l'auto da eliminare è quella con l'autonomia massima, dovrò ricercare quale sarà l'auto con la nuova massima autonomia
+    vertex->maxCar = -1;
+    while (current != NULL && current->data != num) {                 // cerca l'auto da eliminare
+      prev = current;
+      current = current->next;
+      if (prev->data > vertex->maxCar) {                              // man mano che scorro tengo aggiornato maxCar
+        vertex->maxCar = prev->data;
+      }
+    }
+    if (current != NULL) {                                            // se l'auto è stata trovata
+      if (prev == NULL) {                                             // se l'elemento da eliminare è il primo
+        *head = current->next;
+      } else {
+        prev->next = current->next;
+      }
+      free(current);                                                  // libero la memoria e continuo per aggiornare maxCar
+      if (*head == NULL) {                                            // se non ho più macchine allora setto maxCar a -1
+        vertex->maxCar = -1;
+        return true;
+      } else {                                                        // se ho altre macchine nella stazione allora finisco di scorrere la lista per aggiornare maxCar
+        if (prev == NULL) {                                           // se l'elemento eliminato è il primo
+          current = *head;
+        } else {
+          current = prev->next;
+        }
+        while (current != NULL) {                                     // aggiorno maxCar continuando il ciclo
+          prev = current;
+          current = current->next;
+          if (prev->data > vertex->maxCar) {                          // se serve aggiorno maxCar
+            vertex->maxCar = prev->data;
+          }
+        }
+        if (prev->data > vertex->maxCar) {                            // se serve aggiorno maxCar
+          vertex->maxCar = prev->data;
+        }
+        return true;
+      }
+    } else {
+      return false;
+    }
+  }                                                                   // se l'auto da eliminare non è quella con la massima autonomia, non dovrò ricercare quale sarà l'auto con la nuova massima autonomia
+  while (current != NULL && current->data != num) {                   // cerca l'auto da eliminare
+    prev = current;
+    current = current->next;
+  }
+  if (current != NULL) {                                              // se l'auto è stata trovata
+    if (prev == NULL) {                                               // se l'elemento da eliminare è il primo
+      *head = current->next;
+    } else {
+      prev->next = current->next;
+    }
+    free(current);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 /**
@@ -404,6 +505,18 @@ void viewList(list_t *h) {
 }
 
 /**
+ * @brief stampa a video la lista
+ * 
+ * @param h la lista da stampare
+ */
+void viewList2(list2_t *h) {
+  while (h != NULL) {
+    printf("Auto: %d\n", h->data);
+    h = h->next;
+  }
+}
+
+/**
  * @brief elimina la lista
  * 
  * @param list la lista da eliminare
@@ -411,6 +524,24 @@ void viewList(list_t *h) {
  */
 list_t* clearList(list_t *list) {
   list_t *tmp;
+
+  while (list != NULL) {
+    tmp = list;
+    list = list->next;
+    free(tmp);
+    tmp = NULL;
+  }
+  return list;
+}
+
+/**
+ * @brief elimina la lista
+ * 
+ * @param list la lista da eliminare
+ * @return list_t* la lista eliminata
+ */
+list2_t* clearList2(list2_t *list) {
+  list2_t *tmp;
 
   while (list != NULL) {
     tmp = list;
@@ -449,6 +580,7 @@ vertex_t* inVertex(int num) {
   result = malloc (sizeof(vertex_t));
   result->key = num;
   result->cars = NULL;
+  result->maxCar = -1;
   result->color = WHITE;
   result->distance = -1;
   result->maxNext = -1;
@@ -583,59 +715,6 @@ bool searchAndDeleteVertexOrdered(graph_t *graph, int searchKey) {
 }
 
 /**
- * @brief aggiunge uno o più collegamenti tra due vertici quando aggiungo un'auto, settando prima maxNext, poi minNext
- * 
- * @param graph il grafo
- * @param car l'auto inserita
- * @param v_i l'indice del vertice dove l'auto è situata
- */
-void addCarEdge(graph_t *graph, node_t *car, int v_i) {
-  int i, curr_distance;
-  bool found;
-
-  if (treeMaximum(graph->adjLists[v_i]->cars, graph->adjLists[v_i]->cars->root) == car) { // se l'auto che aggiungo ha un'autonomia maggiore rispetto a quelle che ho già allora posso aggiungere gli archi
-    curr_distance = graph->adjLists[v_i]->key;
-    for (i = graph->numVertices-1, found = false; i >= 0 && !found; i--) {  // scorro i vertici nel grafo
-      if (car->key >= abs(graph->adjLists[i]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
-        graph->adjLists[v_i]->maxNext = i;                            // mi salvo l'indice relativo all'adjLists del vertice massimo a dx che posso raggiungere 
-        found = true;
-      }
-    }
-    for (i = 0, found = false; i <= graph->adjLists[v_i]->maxNext && !found; i++) { // scorro i vertici nel grafo
-      if (car->key >= abs(graph->adjLists[i]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
-        graph->adjLists[v_i]->minNext = i;                            // mi salvo l'indice relativo all'adjLists del vertice massimo a sx che posso raggiungere 
-        found = true;
-      }
-    }
-  }
-}
-
-/**
- * @brief verifica se la stazione aggiunta può essere raggiunta dalle altre stazioni
- * 
- * @param graph il grafo
- * @param v_i l'indice del vertice (stazione) aggiunto
- */
-void addStationEdge(graph_t *graph, int v_i) {
-  int i;                                                              // l'indice corrispondente alla stazione
-  node_t *node;                                                       // l'auto di autonomia massima presente nella stazione
-
-  for (i = 0; i < graph->numVertices; i++) {                          // scorro tra i vertici del grafo
-    if (i != v_i && graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // se il vertice che elaboro è diverso da quello che ho appena aggiunto e se contiene almeno un'auto
-      node = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root); // prendo l'auto con la massima autonomia
-      if (node->key >= abs(graph->adjLists[i]->key - graph->adjLists[v_i]->key)) {  // controllo se posso raggiungere la stazione i da v_i
-        if (graph->adjLists[i]->minNext == -1 || v_i < graph->adjLists[i]->minNext) { // se non ho ancora settato minNext o se la stazione è precedente a minNext allora aggiorno minNext
-          graph->adjLists[i]->minNext = v_i;
-        }
-        if (graph->adjLists[i]->maxNext == -1 || v_i > graph->adjLists[i]->maxNext) {  // se non ho ancora settato maxNext o se la stazione è successiva a maxNext allora aggiorno maxNext
-          graph->adjLists[i]->maxNext = v_i;
-        }
-      }
-    }
-  }
-}
-
-/**
  * @brief esegue l'algoritmo di ricerca del cammino minimo Breadth-First Search 
  * 
  * @param graph il grafo
@@ -646,7 +725,6 @@ void addStationEdge(graph_t *graph, int v_i) {
 list_t* BFS(graph_t *graph, int v_i, int v_i2) {
   int i, j, curr_distance;
   bool flag;                                                          // se esamino la distanza del vertice di destinazione non devo controllare gli altri vertici
-  node_t *car;
   vertex_t *vertex, *v;
   list_t *visited;
 
@@ -664,11 +742,10 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
         graph->adjLists[i]->distance = 0;
       }
       if (i != v_i2) {                                                // setto maxNext
-        if (graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // controllo se esiste un'auto nella stazione
-          car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
+        if (graph->adjLists[i]->maxCar != -1) {                       // controllo se esiste un'auto nella stazione
           curr_distance = graph->adjLists[i]->key;
           for (j = i + 1, flag = true; j <= v_i2 && flag; j++) {      // scorro i vertici nel grafo rimanendo nel range che sta tra il vertice che sto elaborando e l'arrivo
-            if (car->key >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
+            if (graph->adjLists[i]->maxCar >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
               graph->adjLists[i]->maxNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a dx che posso raggiungere 
             } else {                                                  // se non posso raggiunngere la stazione successiva setto flag a false
               flag = false;
@@ -688,11 +765,10 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
         graph->adjLists[i]->distance = 0;
       }
       if (i != v_i2) {                                                // setto minNext
-        if (graph->adjLists[i]->cars->root != graph->adjLists[i]->cars->NIL) {  // controllo se esiste un'auto nella stazione
-          car = treeMaximum(graph->adjLists[i]->cars, graph->adjLists[i]->cars->root);  // prendo l'auto con l'autonomia maggiore
+        if (graph->adjLists[i]->maxCar != -1) {                       // controllo se esiste un'auto nella stazione
           curr_distance = graph->adjLists[i]->key;
           for (j = i - 1, flag = true; j >= v_i2 && flag; j--) {      // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
-            if (car->key >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
+            if (graph->adjLists[i]->maxCar >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
               graph->adjLists[i]->minNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a sx che posso raggiungere 
             } else {                                                  // se non posso raggiunngere la stazione successiva setto flag a false
               flag = false;
@@ -828,7 +904,7 @@ void destroyGraph(graph_t *graph) {
  * @param vertex il vertice da deallocare
  */
 void destroyVertex(vertex_t *vertex) {
-  freeTree(vertex->cars);
+  clearList2(vertex->cars);
   free(vertex);
   vertex = NULL;
 }
