@@ -54,5 +54,12 @@ dkms.conf
 # VSCode files
 .vscode
 
-# Output file
+# Executable file
 CercaPercorso
+
+# Test files
+*.txt
+
+# Valgrind files
+callgrind.*
+massif.*
