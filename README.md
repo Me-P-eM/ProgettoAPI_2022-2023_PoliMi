@@ -1,4 +1,4 @@
-# ProgettoAPI
+# CercaPercorso
 CercaPercorso riceve in ingresso una stringa contenente l'istruzione da eseguire. Le istruzioni possono essere:
 - "aggiungi-stazione X Y Z_1 Z_2 ..." aggiunge una stazione alla distanza X, che contiene Y automobili, ciascuna di autonomia Z_1, Z_2, ...;
 - "demolisci-stazione X" demolisce la stazione alla distanza X (e rottama tutte le sue auto);
