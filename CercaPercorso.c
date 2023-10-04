@@ -7,25 +7,17 @@
   - "pianifica-percorso X Y" partendo dalla stazione di distanza X trova il percorso che raggiunge la stazione di distanza Y passando per il minor numero di stazioni possibile.
 
   Più precisamente, le stazioni vengono salvate in una struttura dati a grafo, ogni vertice del grafo conterrà le informazioni riguardanti la singola stazione tra cui le sue auto,
-  immagazzinate in un'altra struttuta dati ad albero rosso-nero.
+  immagazzinate in un'altra struttuta dati a lista.
+  Le stazioni vengono inoltre salvate in un'altra struttura dati, ovvero un'hash map, che ottimizza le tempistiche per la ricerca delle stazioni.
 
   Il grafo contiene il numero totale dei suoi vertici numVertices e un vettore ordinato di vertici **adjLists (la cui dimensione è gestita dinamicamente tramite realloc).
   I vertici sono identificati da un numero intero che si riferisce alla relativa distanza della stazione.
-  I collegamenti direzionali che vanno da un vertice verso gli altri vertici sono presenti implicitamente nel campo maxNext verso dx (analogo per minNext verso sx),
-  dove sarà presente l'indice in **adjLists del vertice più distante che un vertice può raggiungere (se A raggiunge C e B sta tra A e C allora A raggiunge anche B).
-  Questi saranno compilati durante l'algoritmo BFS per la ricerca del percorso più breve.
   Per la ricerca del cammino minimo è stato implementata la visita in ampiezza mediante l'algoritmo Breadth-First Search.
   In ausilio all'algoritmo è stata implementata una nuova struttura dati: la coda.
   Una volta trovata la distanza minima dal nodo di partenza, parto dal vertice di arrivo e vado a ritroso cercando quelli che stanno a distanza -1 e così via,
   fino a raggiungere quello a distanza 0 che è il nodo di partenza, con l'accortezza che, in caso di vertici con distanza uguale, venga preso quello più vicino all'inizio dell'autostrada.
   Per fare ciò si sfrutta una nuova struttura dati, la lista concatenata, in particolare tutti i vertici analizzati dall'algoritmo BFS vengono inseriti in una lista chiamata visited.
   Infine, le stazioni corrette sono inserite nella lista result che viene stampata a video.
-
-  L'albero rosso-nero ha una radice "root" e una foglia "NIL" alla quale tutte le foglie sono collegate.
-  Ogni nodo dell'albero ha un genitore "parent", un figlio sinistro "left" e un figlio destro "right",
-  oltre che al suo valore identificativo (in questo caso l'autonomia dell'auto) e a un identificatore del colore (rosso o nero).
-  Dato un nodo, se scendo a sinistra trovo il minore, se scendo a destra invece il maggiore; inoltre con le regole
-  dei colori rosso/nero, si riesce a "bilanciare" l'albero da un punto di vista spaziale.
 */
 
 
@@ -44,6 +36,8 @@
 #define AUTORM "rottama-auto"                                         // la funzionialità "rottama-auto"
 #define PERCORSO "pianifica-percorso"                                 // la funzionialità "pianifica-percorso"
 #define MAXCHAR 5000                                                  // siccome acquisisco una stringa in ingresso e non conosco la sua dimensione massima, prendo la dimensione massima nel caso peggiore
+#define DIMHASHMAP 50000                                              // la dimensione dell'hashmap
+#define SKIPSIZE 500                                                  // numero di vertici per lo skip
 #define RED true                                                      // un nodo rosso di un albero rosso-nero corrisponde a true
 #define BLACK false                                                   // un nodo nero di un albero rosso-nero corrisponde a false
 
@@ -76,16 +70,14 @@ typedef struct queue_ {
 
 
 /* GRAFO CON LISTE DI ADIACENZA */
-typedef enum {WHITE, GREY, DARK} Color;
+typedef enum {WHITE, GREY, DARK} color;
 
 typedef struct vertex_ {
   int key;                                                            // valore chiave identificativo del vertice (distanza della stazione)
   struct list2_ *cars;                                                // lista contenente le auto nel vertice
   int maxCar;                                                         // l'auto con la massima autonomia
-  Color color;                                                        // il colore del vertice utilizzato per l'algoritmo di ricerca
+  color color;                                                        // il colore del vertice utilizzato per l'algoritmo di ricerca
   int distance;                                                       // la distanza del vertice dal nodo di partenza nell'algoritmo di ricerca
-  int maxNext;                                                        // indice del vertice di massima distanza verso dx della stazione che posso raggiungere
-  int minNext;                                                        // indice del vertice di massima distanza verso sx della stazione che posso raggiungere
   int i;                                                              // indice del vertice corrente nell'adjLists
 } vertex_t;
 
@@ -109,24 +101,40 @@ typedef struct node_ {
 
 
 
+/* HASHMAP */
+typedef struct hashMap_ {
+  struct list_ **buckets;
+} hashMap_t;
+
+
+
 /* FUNZIONI */
 list_t* insertList(list_t*, vertex_t*);                               // inserisce un elemento alla lista in testa
 list2_t* insertList2(list2_t*, int);                                  // inserisce un elemento alla lista in testa
+void insertListOrdered(list_t**, vertex_t*);                          // inserisce un elemento alla lista in modo ordinato
+int searchAndDeleteList(list_t**, int);                               // cerca ed elimina un elemento nella lista
 bool searchAndDeleteList2(list2_t**, vertex_t*, int);                 // cerca ed elimina un elemento nella lista
+bool searchAndDeleteListOrdered(list_t**, int);                       // cerca ed elimina un elemento nella lista mantenendo l'ordine
 void viewList(list_t*);                                               // stampa a video la lista
 void viewList2(list2_t*);                                             // stampa a video la lista
 list_t* clearList(list_t*);                                           // distrugge la lista e i suoi elementi
 list2_t* clearList2(list2_t*);                                        // distrugge la lista e i suoi elementi
 graph_t* inGraph();                                                   // inizializza il grafo
 vertex_t* inVertex(int);                                              // inizializza il vertice
-void printGraph(graph_t*);                                            // stampa a video il grafo
 int searchVertexOrdered(graph_t*, int);                               // cerca se nel grafo è presente un determinato vertice
-int searchAndInsertGraphOrdered(graph_t*, int);                       // inserisce un vertice nel grafo
-bool searchAndDeleteVertexOrdered(graph_t*, int);                     // cerca ed elimina il vertice
+int insertGraphOrdered(graph_t*, vertex_t*, list_t*);                 // inserisce un vertice nel grafo
+vertex_t* deleteVertexOrdered(graph_t*, int);                         // cerca ed elimina il vertice
 list_t* BFS(graph_t*, int, int);                                      // algoritmo di ricerca BFS
 void pianificaPercorso(list_t**, list_t**);                           // cerca il cammino minimo data una lista di stazioni con le relative distanze dal punto di partenza
 void destroyGraph(graph_t*);                                          // elimina il grafo
 void destroyVertex(vertex_t*);                                        // elimina il vertice
+hashMap_t* inHashMap();                                               // inizializza l'hashmap
+void viewHashMap(hashMap_t*);                                         // stampa a video l'hashMap
+int hashFunction(int, int);                                           // calcola la funzione di hash
+int searchHashMap(hashMap_t*, int);                                   // cerca un elemento nell'hashmap
+void insertHashMap(hashMap_t*, vertex_t*);                            // inserisce un elemento nell'hashmap
+int removeHashMap(hashMap_t*, int);                                   // elimina un elemento dall'hashmap
+void destroyHashMap(hashMap_t*);                                      // elimina l'hashmap
 void inQueue();                                                       // inizializza la coda q già allocata e presente in una variabile globale
 void printQueue();                                                    // stampa a video la coda q presente in una variabile globale
 void enqueue(vertex_t*);                                              // aggiunge un vertice alla coda q (variabile globale)
@@ -160,16 +168,19 @@ int main () {
   int j, num, v_i, v_i2;
   char c, *str_tmp;
   graph_t *graph;
+  hashMap_t *hashMap;
   vertex_t *vertex_tmp;
-  list_t *list_tmp, *visited, *result;
+  list_t *list_tmp, *visited, *result, *skip;
 
 /* OPERAZIONI PRELIMINARI */
   graph = inGraph();                                                  // INIZIALIZZO IL GRAFO
+  hashMap = inHashMap();                                              // INIZIALIZZO L'HASHMAP
   str_tmp = NULL;
   str_tmp = malloc(sizeof(char) * MAXCHAR);                           // INIZIALIZZO LA STRINGA
   q = NULL;
   visited = NULL;                                                     // INIZIALIZZO LA LISTA DEGLI ELEMENTI CHE VISITO DURANTE IL BFS
   result = NULL;                                                      // INIZIALIZZO LA LISTA CONTENENTE LE STAZIONI A DISTANZA MINORE
+  skip = NULL;                                                        // INIZIALIZZO LA LISTA CHE MI PERMETTE DI OTTIMIZZARE LO SCORRIMENTO DEL GRAFO
 
 /* INIZIO */
   while (true) {                                                      // CICLO DEL PROGRAMMA
@@ -195,9 +206,13 @@ int main () {
       }
       *(str_tmp+i) = '\0';                                            // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
       num = atoi(str_tmp);                                            // CONVERTO LA DISTANZA DELLA STAZIONE DA STRINGA A INTERO
-      v_i = searchAndInsertGraphOrdered(graph, num);
-      if (v_i != -1) {                                                // SE L'INSERIMENTO È AVVENUTO CON SUCCESSO PERCHÉ NON ESISTEVA ANCORA NESSUNA STAZIONE A QUELLA DISTANZA
-        vertex_tmp = graph->adjLists[v_i];
+      if (searchHashMap(hashMap, num) == -1) {                        // SE NON ESISTE LA STAZIONE LA INSERISCO
+        vertex_tmp = inVertex(num);
+        insertHashMap(hashMap, vertex_tmp);
+        insertGraphOrdered(graph, vertex_tmp, skip);
+        if (graph->numVertices % SKIPSIZE == 0 && graph->numVertices >= SKIPSIZE) { // OGNI SKIPSIZE STAZIONI CHE INSERISCO, UNA LA INSERISCO NELLA LISTA DI SKIP
+          insertListOrdered(&skip, vertex_tmp);
+        }
         i = 0;                                                        // <- QUI CONTINUA L'ACQUISIZIONE DELLA STRINGA
         c = getchar_unlocked();
         while (c != ' ' && c != '\n') {
@@ -216,10 +231,10 @@ int main () {
             c = getchar_unlocked();
           }
           *(str_tmp+i) = '\0';                                        // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
-          v_i2 = atoi(str_tmp);                                       // CONVERTO L'AUTONOMIA DELL'AUTO DA STRINGA A INTERO
-          vertex_tmp->cars = insertList2(vertex_tmp->cars, v_i2);     // INSERISCO L'AUTO NELLA LISTA
-          if (vertex_tmp->maxCar < v_i2) {                            // SE AGGIUNGO UN'AUTO CON AUTONOMIA MAGGIORE RISPETTO A QUELLA MASSIMA CHE HO ALLORA AGGIORNO
-            vertex_tmp->maxCar = v_i2;
+          v_i = atoi(str_tmp);                                        // CONVERTO L'AUTONOMIA DELL'AUTO DA STRINGA A INTERO
+          vertex_tmp->cars = insertList2(vertex_tmp->cars, v_i);      // INSERISCO L'AUTO NELLA LISTA
+          if (vertex_tmp->maxCar < v_i) {                             // SE AGGIUNGO UN'AUTO CON AUTONOMIA MAGGIORE RISPETTO A QUELLA MASSIMA CHE HO ALLORA AGGIORNO
+            vertex_tmp->maxCar = v_i;
           }
         }
         puts("aggiunta");                                             // STAMPO IN OUTPUT CHE LA STAZIONE È STATA AGGIUNTA
@@ -238,7 +253,11 @@ int main () {
       }
       *(str_tmp+i) = '\0';                                            // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
       num = atoi(str_tmp);                                            // CONVERTO LA DISTANZA DELLA STAZIONE DA STRINGA A INTERO
-      if (searchAndDeleteVertexOrdered(graph, num)) {
+      v_i = removeHashMap(hashMap, num);
+      if (v_i != -1) {
+        searchAndDeleteListOrdered(&skip, num);
+        vertex_tmp = deleteVertexOrdered(graph, v_i);
+        destroyVertex(vertex_tmp);
         puts("demolita");
       } else {
         puts("non demolita");
@@ -254,7 +273,7 @@ int main () {
       }
       *(str_tmp+i) = '\0';                                            // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
       num = atoi(str_tmp);                                            // CONVERTO LA DISTANZA DELLA STAZIONE DA STRINGA A INTERO
-      v_i = searchVertexOrdered(graph, num);
+      v_i = searchHashMap(hashMap, num);
       if (v_i != -1) {
         i = 0;                                                        // <- QUI CONTINUA L'ACQUISIZIONE DELLA STRINGA
         c = getchar_unlocked();
@@ -286,7 +305,7 @@ int main () {
       }
       *(str_tmp+i) = '\0';                                            // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
       num = atoi(str_tmp);                                            // CONVERTO LA DISTANZA DELLA STAZIONE DA STRINGA A NUMERO INTERO
-      v_i = searchVertexOrdered(graph, num);
+      v_i = searchHashMap(hashMap, num);
       if (v_i != -1) {
         i = 0;                                                        // <- QUI CONTINUA L'ACQUISIZIONE DELLA STRINGA
         c = getchar_unlocked();
@@ -318,7 +337,7 @@ int main () {
       }
       *(str_tmp+i) = '\0';                                            // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
       start = atoi(str_tmp);                                          // CONVERTO LA DISTANZA DELLA STAZIONE DI PARTENZA
-      v_i = searchVertexOrdered(graph, start);
+      v_i = searchHashMap(hashMap, start);
       if (v_i != -1) {
         i = 0;                                                        // <- QUI CONTINUA L'ACQUISIZIONE DELLA STRINGA
         c = getchar_unlocked();
@@ -329,7 +348,7 @@ int main () {
         }
         *(str_tmp+i) = '\0';                                          // <- QUI FINISCE L'ACQUISIZIONE DELLA STRINGA, INSERENDO IL CARATTERE TERMINATORE
         end = atoi(str_tmp);                                          // CONVERTO LA DISTANZA DELLA STAZIONE DI ARRIVO
-        v_i2 = searchVertexOrdered(graph, end);
+        v_i2 = searchHashMap(hashMap, end);
         if (v_i2 != -1) {
           visited = BFS(graph, v_i, v_i2);                            // ELABORO LE DISTANZE DELLE ALTRE STAZIONI DALLA STAZIONE DI PARTENZA
           if (visited->data->key == end) {                            // SE ESISTE UN CAMMINO CHE COLLEGA LA PARTENZA CON L'ARRIVO
@@ -374,6 +393,10 @@ int main () {
   str_tmp = NULL;
   destroyGraph(graph);                                                // LIBERO IL GRAFO
   graph = NULL;
+  destroyHashMap(hashMap);                                            // LIBERO L'HASHMAP
+  hashMap = NULL;
+  clearList(skip);                                                    // LIBERO LA LISTA DI SKIP
+  skip = NULL;
 */
   return 0;
 }
@@ -417,6 +440,57 @@ list2_t* insertList2(list2_t *h, int num) {
 }
 
 /**
+ * @brief inserisce un elemento in una lista in modo ordinato
+ * 
+ * @param head la testa della lista
+ * @param vetrex il vertice da inserire
+*/
+void insertListOrdered(list_t **head, vertex_t *vertex) {
+  list_t *tmp, *current;
+
+  tmp = malloc(sizeof(list_t));
+  tmp->data = vertex;
+  tmp->next = NULL;
+  if (*head == NULL || vertex->key < (*head)->data->key) {                 // se la lista è vuota o se l'elemento è il più piccolo della lista inserisco in testa
+    tmp->next = *head;
+    *head = tmp;
+    return;
+  }  
+  current = *head;                                                    // se sono qua devo inserire in mezzo o in coda
+  while (current->next != NULL && current->next->data->key <= vertex->key) {
+    current = current->next;
+  }
+  tmp->next = current->next;
+  current->next = tmp;
+}
+
+/**
+ * @brief cerca se è presente un elemento nella lista e lo elimina
+ * 
+ * @param head la testa della lista
+ * @param searchKey la chiave da cercare
+ * @return int l'indice del vertice eliminato, se non è stato trovato ritorna -1
+ */
+int searchAndDeleteList(list_t **head, int searchKey) {
+  list_t *prev = NULL;
+  list_t *current = *head;
+
+  while (current != NULL) {                                           // scorro la lista
+    if (current->data->key == searchKey) {                            // ho trovato il vertice
+      if (prev == NULL) {
+        *head = current->next;                                        // il vertice è in testa alla lista
+      } else {
+        prev->next = current->next;
+      }
+      return current->data->i;
+    }
+    prev = current;
+    current = current->next;
+  }
+  return -1;
+}
+
+/**
  * @brief cerca se è presente l'autonomia dell'auto da eliminare
  * 
  * @param head la testa della lista
@@ -427,6 +501,7 @@ list2_t* insertList2(list2_t *h, int num) {
 bool searchAndDeleteList2(list2_t **head, vertex_t *vertex, int num) {
   list2_t *current;
   list2_t *prev;
+
   if (*head == NULL)
     return false;
   current = *head;
@@ -450,6 +525,7 @@ bool searchAndDeleteList2(list2_t **head, vertex_t *vertex, int num) {
         prev->next = current->next;
       }
       free(current);                                                  // libero la memoria e continuo per aggiornare maxCar
+      current = NULL;
       if (*head == NULL) {                                            // se non ho più macchine allora setto maxCar a -1
         vertex->maxCar = -1;
         return true;
@@ -486,10 +562,39 @@ bool searchAndDeleteList2(list2_t **head, vertex_t *vertex, int num) {
       prev->next = current->next;
     }
     free(current);
+    current = NULL;
     return true;
   } else {
     return false;
   }
+}
+
+/**
+ * @brief cerca se è presente un elemento nella lista e lo elimina, mantenendo l'ordine
+ * 
+ * @param head la testa della lista
+ * @param searchKey l'elemento da eliminare
+ * @return bool l'esito della rimozione
+*/
+bool searchAndDeleteListOrdered(list_t **head, int searchKey) {
+  list_t *current = *head;
+  list_t *prev = NULL;
+
+  while (current != NULL && current->data->key != searchKey) {
+    prev = current;
+    current = current->next;
+  }
+  if (current == NULL) {
+    return false;
+  }
+  if (prev == NULL) {                                                 // se l'elemento da eliminare è in testa
+    *head = current->next;
+  } else {
+    prev->next = current->next;
+  }
+  free(current);
+  current = NULL;
+  return true;
 }
 
 /**
@@ -583,30 +688,8 @@ vertex_t* inVertex(int num) {
   result->maxCar = -1;
   result->color = WHITE;
   result->distance = -1;
-  result->maxNext = -1;
-  result->minNext = -1;
   result->i = -1;
   return result;
-}
-
-/**
- * @brief stampa a video il grafo
- * 
- * @param graph il grafo
- */
-void printGraph(graph_t *graph) {
-  int i, j;
-
-  for (i = 0; i < graph->numVertices; i++) {                          // scorro i vertici del grafo
-    printf("Vertex %d\n: ", graph->adjLists[i]->key);                 // stampo il vertice nel grafo
-    for (j = graph->adjLists[i]->minNext; j != -1 && j <= graph->adjLists[i]->maxNext; j++) { // scorro i vertici che un vertice può raggiungere
-      if (i != j) {
-        printf("%d -> ", graph->adjLists[j]->key);                    // stampo il corrispondente valore
-      }
-    }
-    puts("");
-    //printf("MIN: %d - MAX: %d\n", graph->adjLists[i]->minNext, graph->adjLists[i]->maxNext);
-  }
 }
 
 /**
@@ -638,30 +721,33 @@ int searchVertexOrdered(graph_t *graph, int searchKey) {
 }
 
 /**
- * @brief cerca se c'è già il vertice che si vuole inserire, se non c'è lo inserisce nel grafo mantenendo l'ordine
+ * @brief inserisce il vertice nel grafo mantenendo l'ordine
  * 
  * @param graph il grafo
- * @param num la distanza del vertice da agiungere
- * @return int la posizione del vertice aggiunto della adjLists (il suo indice), se era già presente una stazione alla determinata distanza ritorno -1 e non aggiungo nulla
+ * @param vertex il vertice da aggiungere
+ * @param skip la lista per skippare i vertici
+ * @return int la posizione del vertice aggiunto della adjLists (il suo indice)
  */
-int searchAndInsertGraphOrdered(graph_t *graph, int num) {
+int insertGraphOrdered(graph_t *graph, vertex_t *vertex, list_t *skip) {
   int i, j;
-  vertex_t *vertex;
 
   i = 0;
-  while (i < graph->numVertices && num > graph->adjLists[i]->key) {   // scorro il grafo
+  while (skip != NULL) {
+    if (skip->data->key > vertex->key) {
+      break;
+    }
+    i = skip->data->i;
+    skip = skip->next;
+  }
+  while (i < graph->numVertices && vertex->key > graph->adjLists[i]->key) {   // scorro il grafo
     i++;
   }
   if (i == graph->numVertices) {                                      // se il grafo non ha vertici o se arrivo alla fine del grafo faccio un inserimento in coda
     graph->numVertices++;
-    vertex = inVertex(num);
     graph->adjLists = realloc(graph->adjLists, (graph->numVertices) * sizeof(vertex_t*)); // alloco dinamicamente la memoria del vettore dei vertici
     graph->adjLists[i] = vertex;
     vertex->i = i;
     return i;
-  }
-  if (num == graph->adjLists[i]->key) {                               // se il vertice da inserire è già presente e quindi non lo devo inserire
-    return -1;
   }
   graph->numVertices++;                                               // se sono qua devo inserire il vertice in mezzo alla lista o in testa
   graph->adjLists = realloc(graph->adjLists, (graph->numVertices) * sizeof(vertex_t*)); // alloco dinamicamente la memoria del vettore dei vertici
@@ -670,7 +756,6 @@ int searchAndInsertGraphOrdered(graph_t *graph, int num) {
       graph->adjLists[j] = graph->adjLists[j-1];                      // sposto tutti i vertici a destra di uno fino alla posizione desiderata
       graph->adjLists[j]->i = j;
     } else {
-      vertex = inVertex(num);
       graph->adjLists[i] = vertex;                                    // inserisco il vertice
       vertex->i = i;
     }
@@ -679,39 +764,24 @@ int searchAndInsertGraphOrdered(graph_t *graph, int num) {
 }
 
 /**
- * @brief cerca ed elimina il vertice dal grafo mantenendo l'ordine
+ * @brief elimina il vertice dal grafo mantenendo l'ordine
  * 
  * @param graph il grafo
- * @param searchKey la chiave nel vertice da eliminare
- * @return bool l'esito dell'eliminazione
+ * @param i l'indice nell'adjLists del vertice da eliminare
+ * @return vertex_t il vertice rimosso dal grafo
  */
-bool searchAndDeleteVertexOrdered(graph_t *graph, int searchKey) {
-  int i, j;
+vertex_t* deleteVertexOrdered(graph_t *graph, int i) {
+  int j;
   vertex_t *vertex;
 
-  i = 0;
-  while (i < graph->numVertices && graph->adjLists[i]->key <= searchKey) {  // cerco il vertice da eliminare
-    if (graph->adjLists[i]->key == searchKey) {
-      break;
-    }
-    i++;
-  }
-  if (i == graph->numVertices) {                                      // se il vertice non è stato trovato
-    return false;
-  }
-  if (graph->adjLists[i]->key != searchKey) {                         // se il vertice non c'è e la ricerca è stata interrotta prematuramente per l'ottimizzazione sull'ordinamento
-    return false;
-  }
-  vertex = graph->adjLists[i];                                        // se ho trovato il vertice da eliminare
+  vertex = graph->adjLists[i];                                        // il vertice da eliminare
   for (j = i; j < graph->numVertices - 1; j++) {
     graph->adjLists[j] = graph->adjLists[j+1];                        // sposto tutti i vertici a sinistra di uno
     graph->adjLists[j]->i = j;
   }
-  destroyVertex(vertex);
-  vertex = NULL;
   graph->numVertices--;
   graph->adjLists = realloc(graph->adjLists, (graph->numVertices) * sizeof(vertex_t*)); // dealloco dinamicamente la memoria del vettore che contiene i vertici
-  return true;
+  return vertex;
 }
 
 /**
@@ -723,7 +793,7 @@ bool searchAndDeleteVertexOrdered(graph_t *graph, int searchKey) {
  * @return list_t* la lista dei vertici visitati durante l'algoritmo
  */
 list_t* BFS(graph_t *graph, int v_i, int v_i2) {
-  int i, j, curr_distance;
+  int i, curr_distance;
   bool flag;                                                          // se esamino la distanza del vertice di destinazione non devo controllare gli altri vertici
   vertex_t *vertex, *v;
   list_t *visited;
@@ -733,48 +803,22 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
   
   if (start < end) {                                                  // se nel cammino devo andare verso destra allora prendo i vertici che stanno a destra del vertice
     for (i = v_i; i <= v_i2; i++) {
-      graph->adjLists[i]->maxNext = -1;
       if (i != v_i) {
         graph->adjLists[i]->color = WHITE;
         graph->adjLists[i]->distance = -1;
       } else {
         graph->adjLists[i]->color = GREY;
         graph->adjLists[i]->distance = 0;
-      }
-      if (i != v_i2) {                                                // setto maxNext
-        if (graph->adjLists[i]->maxCar != -1) {                       // controllo se esiste un'auto nella stazione
-          curr_distance = graph->adjLists[i]->key;
-          for (j = i + 1, flag = true; j <= v_i2 && flag; j++) {      // scorro i vertici nel grafo rimanendo nel range che sta tra il vertice che sto elaborando e l'arrivo
-            if (graph->adjLists[i]->maxCar >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
-              graph->adjLists[i]->maxNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a dx che posso raggiungere 
-            } else {                                                  // se non posso raggiunngere la stazione successiva setto flag a false
-              flag = false;
-            }
-          }
-        }
       }
     }
   } else {                                                            // se nel cammino devo andare verso sinistra allora prendo i vertici che stanno a sinistra del vertice
     for (i = v_i; i >= v_i2; i--) {
-      graph->adjLists[i]->minNext = -1;
       if (i != v_i) {
         graph->adjLists[i]->color = WHITE;
         graph->adjLists[i]->distance = -1;
       } else {
         graph->adjLists[i]->color = GREY;
         graph->adjLists[i]->distance = 0;
-      }
-      if (i != v_i2) {                                                // setto minNext
-        if (graph->adjLists[i]->maxCar != -1) {                       // controllo se esiste un'auto nella stazione
-          curr_distance = graph->adjLists[i]->key;
-          for (j = i - 1, flag = true; j >= v_i2 && flag; j--) {      // scorro i vertici nel grafo rimanendo nel range che sta tra l'arrivo e il vertice che sto elaborando
-            if (graph->adjLists[i]->maxCar >= abs(graph->adjLists[j]->key - curr_distance)) { // controllo se non sto considerando il vertice stesso e se posso raggiungere la stazione i da v_i
-              graph->adjLists[i]->minNext = j;                        // mi salvo l'indice relativo all'adjLists del vertice massimo a sx che posso raggiungere 
-            } else {                                                  // se non posso raggiunngere la stazione successiva setto flag a false
-              flag = false;
-            }
-          }
-        }
       }
     }
   }
@@ -785,35 +829,42 @@ list_t* BFS(graph_t *graph, int v_i, int v_i2) {
   flag = false;
   while (q->length > 0 && !flag) {
     vertex = dequeue();
+    curr_distance = vertex->key;
     if (start < end) {                                                // se nel cammino devo andare verso destra allora prendo i vertici che stanno a destra del vertice
-      for (i = vertex->i + 1; i <= vertex->maxNext; i++) {
-        if (graph->adjLists[i]->key <= end) {                         // lo elaboro se è precedente alla stazione finale
-          v = graph->adjLists[i];
+      for (i = vertex->i + 1; i < graph->numVertices; i++) {
+        v = graph->adjLists[i];
+        if (vertex->maxCar != -1 && vertex->maxCar >= abs(v->key - curr_distance)) {  // controllo se posso raggiungere la stazione
           if (v->color == WHITE) {
-            visited = insertList(visited, v);
             v->color = GREY;
-            v->distance = (vertex->distance) + 1;
+            v->distance = vertex->distance + 1;
+            visited = insertList(visited, v);
             if (v->key == end) {
               flag = true;
               break;
             }
             enqueue(v);
           }
+        } else {
+          break;
         }
       }
       vertex->color = DARK;
     } else {                                                          // se nel cammino devo andare verso sinistra allora prendo i vertici che stanno a sinistra del vertice
-      for (i = vertex->minNext; i < vertex->i && i != -1; i++) {
+      for (i = vertex->i - 1; i >= 0; i--) {
         v = graph->adjLists[i];
-        if (v->color == WHITE) {
-          visited = insertList(visited, v);
-          v->color = GREY;
-          v->distance = (vertex->distance) + 1;
-          if (v->key == end) {
-            flag = true;
-            break;
+        if (vertex->maxCar != -1 && vertex->maxCar >= abs(v->key - curr_distance)) {  // controllo se posso raggiungere la stazione
+          if (v->color == WHITE) {
+            v->color = GREY;
+            v->distance = vertex->distance + 1;
+            visited = insertList(visited, v);
+            if (v->key == end) {
+              flag = true;
+              break;
+            }
+            enqueue(v);
           }
-          enqueue(v);
+        } else {
+          break;
         }
       }
       vertex->color = DARK;
@@ -842,10 +893,10 @@ void pianificaPercorso(list_t **visited, list_t **result) {
   for (list_tmp = (*visited)->next; list_tmp != NULL; list_tmp = list_tmp->next) {  // controllo tutti i possibili percorsi a ritroso
     if (start < end) {                                                // se il percorso è verso destra
       if (list_tmp->data->distance < dist && list_tmp->data->key < (*result)->data->key) { // se la distanza scende di uno e il vertice si trova a sinistra dell'altro, ho trovato quello più veloce
-        if ((*result)->data->i <= list_tmp->data->maxNext && flag == false) { // controllo se il più veloce è raggiungibile
+        if (list_tmp->data->maxCar >= abs((*result)->data->key - list_tmp->data->key) && flag == false) { // controllo se il più veloce è raggiungibile
           vertex_tmp = list_tmp->data;
           flag = true;
-        } else if (flag == true && list_tmp->data->key < vertex_tmp->key && (*result)->data->i <= list_tmp->data->maxNext) {
+        } else if (flag == true && list_tmp->data->key < vertex_tmp->key && list_tmp->data->maxCar >= abs((*result)->data->key - list_tmp->data->key)) {
           vertex_tmp = list_tmp->data;                                // se non è il primo che trovo ed è più vicino all'autostrada rispetto a quello precedentemente trovato ed è raggiungibile, allora devo aggiornare
         }
         if (list_tmp->data->key == start || (vertex_tmp->distance > list_tmp->next->data->distance && flag == true)) { // se sono arrivato alla fine entro, altrimenti se esistono vertici successivi con la stessa distanza prendo i successivi e salto questo passaggio
@@ -856,10 +907,10 @@ void pianificaPercorso(list_t **visited, list_t **result) {
       }
     } else {                                                          // se il percorso è verso sinistra
       if (list_tmp->data->distance < dist && list_tmp->data->key > (*result)->data->key) { // se la distanza scende di uno e il vertice si trova a destra dell'altro, ho trovato quello più veloce
-        if ((*result)->data->i >= list_tmp->data->minNext && list_tmp->data->minNext != -1 && flag == false) { // controllo se il più veloce è raggiungibile e se è il primo che trovo
+        if (list_tmp->data->maxCar >= abs((*result)->data->key - list_tmp->data->key) && flag == false) { // controllo se il più veloce è raggiungibile e se è il primo che trovo
           vertex_tmp = list_tmp->data;
           flag = true;                                                // se aggiorno vertex_tmp potrò entrare nell'inserimento
-        } else if (flag == true && list_tmp->data->key < vertex_tmp->key && (*result)->data->i >= list_tmp->data->minNext && list_tmp->data->minNext != -1) { // se non è il primo che trovo ed è più vicino all'autostrada rispetto a quello precedentemente trovato ed è raggiungibile, allora devo aggiornare
+        } else if (flag == true && list_tmp->data->key < vertex_tmp->key && list_tmp->data->maxCar >= abs((*result)->data->key - list_tmp->data->key)) { // se non è il primo che trovo ed è più vicino all'autostrada rispetto a quello precedentemente trovato ed è raggiungibile, allora devo aggiornare
           vertex_tmp = list_tmp->data;
         }
         if (list_tmp->data->key == start || (vertex_tmp->distance > list_tmp->next->data->distance && flag == true)) { // se sono arrivato alla fine entro, altrimenti se esistono vertici successivi con la stessa distanza prendo i successivi e salto questo passaggio
@@ -907,6 +958,137 @@ void destroyVertex(vertex_t *vertex) {
   clearList2(vertex->cars);
   free(vertex);
   vertex = NULL;
+}
+
+/**
+ * @brief inizializza l'hashmap
+ * 
+ * @return hashMap_t l'hashmap inizializzata
+*/
+hashMap_t* inHashMap() {
+  int i;
+  hashMap_t *result;
+
+  result = NULL;
+  result = malloc(sizeof(hashMap_t));
+  result->buckets = NULL;
+  result->buckets = malloc(sizeof(list_t) * DIMHASHMAP);
+  for (i = 0; i < DIMHASHMAP; i++) {
+    result->buckets[i] = NULL;
+  }
+  return result;
+}
+
+/**
+ * @brief visualizza gli elementi presenti nell'hashmap
+ * 
+ * @param hashMap l'hashmap
+*/
+void viewHashMap(hashMap_t *hashMap) {
+  int i;
+  list_t *current;
+
+  for (i = 0; i < DIMHASHMAP; i++) {
+    current = hashMap->buckets[i];
+    if (current != NULL) {
+      printf("Stazione: %d, indice hashmap: %d, indice adjLists: %d -> ", current->data->key, i, current->data->i);
+      current = current->next;
+      while (current != NULL) {
+        printf("Stazione: %d, indice hashmap: %d, indice adjLists: %d -> ", current->data->key, i, current->data->i);
+        current = current->next;
+      }
+      puts("");
+    }
+  }
+}
+
+/**
+ * @brief calcola la funzione di hash
+ * 
+ * @param key la chiave della stazione che sto aggiungendo/inserendo/...
+ * @param size la dimensione dell'hashmap
+ * @return int il risultato del calcolo della funzione di hash
+*/
+int hashFunction(int key, int size) {
+  return key % size;
+}
+
+/**
+ * @brief cerca un elemento nell'hashmap
+ * 
+ * @param hashMap l'hashmap
+ * @param key la chiave da ricercare
+ * @return int l'indice della stazione dell'adjLists, se non è stato trovato ritorna -1
+*/
+int searchHashMap(hashMap_t *hashMap, int key) {
+  int i;
+  list_t *current;
+
+  i = hashFunction(key, DIMHASHMAP);
+  current = hashMap->buckets[i];
+  while (current != NULL) {
+    if (current->data->key == key) {
+      return current->data->i;
+    }
+    current = current->next;
+  }
+  return -1;
+}
+
+/**
+ * @brief inserisce un elemento nell'hashmap
+ * 
+ * @param hashMap l'hashmap
+ * @param vertex il vertice da aggiungere
+*/
+void insertHashMap(hashMap_t *hashMap, vertex_t *vertex) {
+  int i;
+
+  i = hashFunction(vertex->key, DIMHASHMAP);
+  hashMap->buckets[i] = insertList(hashMap->buckets[i], vertex);
+}
+
+/**
+ * @brief rimuove un elemento dell'hashmap
+ * 
+ * @param hashMap l'hashmap
+ * @param key la chiave dell'elemento
+ * @return int l'indice della stazione dell'adjLists eliminata, se non è stata eliminata ritorna -1
+*/
+int removeHashMap(hashMap_t *hashMap, int key) {
+  int i;
+  list_t *current;
+
+  i = hashFunction(key, DIMHASHMAP);
+  current = hashMap->buckets[i];
+  i = searchAndDeleteList(&current, key);
+  return i;
+}
+
+/**
+ * @brief libera la memoria dell'hashmap
+ * 
+ * @param hashMap l'hashmap
+*/
+void destroyHashMap(hashMap_t *hashMap) {
+  int i;
+  list_t *tmp, *current;
+
+  if (hashMap != NULL) {
+    if (hashMap->buckets != NULL) {
+      for (i = 0; i < DIMHASHMAP; i++) {
+        current = hashMap->buckets[i];
+        while (current != NULL) {
+          tmp = current;
+          current = current->next;
+          free(tmp);
+          tmp = NULL;
+        }
+      }
+      free(hashMap->buckets);
+    }
+    free(hashMap);
+  }
 }
 
 /**
@@ -1352,11 +1534,3 @@ void freeTree(tree_t *tree) {
     free(tree);
   }
 }
-
-
-/* TODO
-  Forse si può evitare la addStationEdge() e aggiungere i link nella searchAndInsertGraphOrdered(). FATTO
-  Ricontrolla destroyTree(). Dovrebbe essere giusta.
-  La searchAndDeleteNode() è giusta? E la deleteFixup()? Dovrebbero essere giuste.
-  Implementare uno scorrimento iterativo in un albero con *next è più efficiente per eliminarlo nella destroyTree()?
-*/
